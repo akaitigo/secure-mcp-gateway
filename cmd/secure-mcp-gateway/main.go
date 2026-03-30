@@ -3,13 +3,16 @@ package main
 import (
 	"context"
 	"log/slog"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/akaitigo/secure-mcp-gateway/internal/audit"
 	"github.com/akaitigo/secure-mcp-gateway/internal/auth"
 	"github.com/akaitigo/secure-mcp-gateway/internal/config"
+	"github.com/akaitigo/secure-mcp-gateway/internal/grpcserver"
 	"github.com/akaitigo/secure-mcp-gateway/internal/proxy"
 )
 
@@ -27,6 +30,16 @@ func run() error {
 		return err
 	}
 
+	// Set up audit logging.
+	auditStore := audit.NewStore()
+	auditLogger, err := audit.NewLogger(cfg.AuditLogPath, auditStore)
+	if err != nil {
+		return err
+	}
+	auditMiddleware := audit.NewMiddleware(auditLogger,
+		audit.WithSkipPaths("/health"),
+	)
+
 	// Set up OAuth2 token verification middleware.
 	introspector, err := auth.NewHydraIntrospector(cfg.HydraAdminURL, nil)
 	if err != nil {
@@ -36,19 +49,35 @@ func run() error {
 		auth.WithSkipPaths("/health"),
 	)
 
+	// Build proxy with middleware chain:
+	// RequestID -> Auth -> Audit -> Proxy handler
 	srv, err := proxy.New(cfg.ProxyListenAddr, cfg.UpstreamMCPURL,
+		proxy.WithMiddleware(audit.RequestIDMiddleware),
 		proxy.WithMiddleware(authMiddleware.Handler),
+		proxy.WithMiddleware(auditMiddleware.Handler),
 	)
 	if err != nil {
 		return err
 	}
 
-	// Graceful shutdown: listen for SIGTERM/SIGINT.
-	errCh := make(chan error, 1)
+	// Start gRPC management server.
+	grpcSrv := grpcserver.New(auditStore)
+	grpcLn, err := net.Listen("tcp", cfg.GRPCListenAddr)
+	if err != nil {
+		return err
+	}
+
+	errCh := make(chan error, 2)
+
 	go func() {
 		errCh <- srv.ListenAndServe()
 	}()
 
+	go func() {
+		errCh <- grpcSrv.Serve(grpcLn)
+	}()
+
+	// Graceful shutdown: listen for SIGTERM/SIGINT.
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
 
@@ -64,5 +93,6 @@ func run() error {
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 
+	grpcSrv.GracefulStop()
 	return srv.Shutdown(ctx)
 }
