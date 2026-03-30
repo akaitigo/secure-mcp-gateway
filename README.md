@@ -29,39 +29,103 @@
 
 ## Quick Start
 
+### Prerequisites
+
+- Go 1.24+
+- Docker & Docker Compose
+- (Optional) [golangci-lint](https://golangci-lint.run/), [gofumpt](https://github.com/mvdan/gofumpt)
+
+### 1. Clone & Setup
+
 ```bash
-# Clone
 git clone https://github.com/akaitigo/secure-mcp-gateway.git
 cd secure-mcp-gateway
-
-# Set up environment variables
 cp .env.example .env
+```
 
-# Start local development dependencies (ORY Hydra + OPA + mock MCP server)
+### 2. Start Dependencies
+
+Docker Compose starts ORY Hydra (OAuth2), OPA (policy engine), and a mock MCP server:
+
+```bash
 docker compose up -d
 
+# Verify all services are healthy
+docker compose ps
+# Expected: hydra, opa, mock-mcp all "running"
+```
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| ORY Hydra (Public) | `4444` | OAuth2 token endpoint |
+| ORY Hydra (Admin) | `4445` | Token introspection |
+| OPA | `8181` | Policy evaluation |
+| Mock MCP Server | `3001` | Upstream MCP (dev only) |
+
+### 3. Build & Run
+
+```bash
 # Build
 make build
 
-# Run tests
+# Run the gateway
+./secure-mcp-gateway
+# Proxy listens on :8080, gRPC on :9090
+```
+
+### 4. Create a Test Token & Send a Request
+
+```bash
+# Create an OAuth2 client in Hydra
+docker compose exec hydra hydra create oauth2-client \
+  --endpoint http://localhost:4445 \
+  --grant-type client_credentials \
+  --scope tools:read,tools:call \
+  --format json
+
+# Request a token (replace CLIENT_ID and CLIENT_SECRET from the output above)
+TOKEN=$(curl -s -X POST http://localhost:4444/oauth2/token \
+  -u "$CLIENT_ID:$CLIENT_SECRET" \
+  -d grant_type=client_credentials \
+  -d scope="tools:read tools:call" | jq -r .access_token)
+
+# Call the gateway with the token
+curl -s -X POST http://localhost:8080/ \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | jq
+```
+
+### 5. Run Tests
+
+```bash
+# Unit + integration tests with race detector
 make test
 
-# Full check (format → tidy → lint → test → build)
+# Full check (format -> tidy -> lint -> test -> build)
 make check
 ```
 
 ## Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `HYDRA_ADMIN_URL` | Yes | ORY Hydra Admin API URL |
-| `HYDRA_PUBLIC_URL` | Yes | ORY Hydra Public API URL |
-| `OPA_URL` | Yes | OPA server URL |
-| `UPSTREAM_MCP_URL` | Yes | Upstream MCP server URL |
-| `PROXY_LISTEN_ADDR` | No | Listen address (default: `:8080`) |
-| `AUDIT_LOG_PATH` | No | Audit log output path (default: `stdout`) |
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `HYDRA_ADMIN_URL` | Yes | - | ORY Hydra Admin API URL |
+| `HYDRA_PUBLIC_URL` | Yes | - | ORY Hydra Public API URL |
+| `OPA_URL` | Yes | - | OPA server URL |
+| `UPSTREAM_MCP_URL` | Yes | - | Upstream MCP server URL |
+| `PROXY_LISTEN_ADDR` | No | `:8080` | HTTP proxy listen address |
+| `AUDIT_LOG_PATH` | No | `stdout` | Audit log output path (file path or `stdout`) |
+| `GRPC_LISTEN_ADDR` | No | `:9090` | gRPC management API listen address |
 
 > **NOTE**: Authentication, authorization, and audit logging must be properly configured before production use.
+
+## Architecture Decision Records
+
+Key design decisions are documented in [`docs/adr/`](docs/adr/):
+
+- [ADR-001: MCP Transport Layer](docs/adr/0001-mcp-transport-layer.md) — HTTP/SSE を採用した理由
+- [ADR-002: Policy Engine](docs/adr/0002-policy-engine-opa.md) — OPA を採用した理由
 
 ## Development
 
