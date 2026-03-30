@@ -38,7 +38,7 @@ func newTestProxy(t *testing.T, upstreamURL string) (string, func()) {
 	proxyURL := fmt.Sprintf("http://%s", ln.Addr().String())
 
 	cleanup := func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancel()
 		_ = srv.Shutdown(ctx)
 	}
@@ -57,7 +57,7 @@ func TestHealth(t *testing.T) {
 	proxyURL, cleanup := newTestProxy(t, upstream.URL)
 	defer cleanup()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, proxyURL+"/health", nil)
 	require.NoError(t, err)
 
@@ -101,7 +101,7 @@ func TestProxy_ForwardJSONRPCRequest(t *testing.T) {
 	defer cleanup()
 
 	body := `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`
-	ctx := context.Background()
+	ctx := t.Context()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, proxyURL+"/",
 		strings.NewReader(body))
 	require.NoError(t, err)
@@ -147,7 +147,7 @@ func TestProxy_ToolsCallForwarding(t *testing.T) {
 	defer cleanup()
 
 	body := `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"test-tool"}}`
-	ctx := context.Background()
+	ctx := t.Context()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, proxyURL+"/",
 		strings.NewReader(body))
 	require.NoError(t, err)
@@ -180,7 +180,7 @@ func TestProxy_InvalidContentType(t *testing.T) {
 	defer cleanup()
 
 	body := `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`
-	ctx := context.Background()
+	ctx := t.Context()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, proxyURL+"/",
 		strings.NewReader(body))
 	require.NoError(t, err)
@@ -211,7 +211,7 @@ func TestProxy_InvalidJSONRPC(t *testing.T) {
 	defer cleanup()
 
 	body := `{"jsonrpc":"1.0","id":1,"method":"tools/list"}`
-	ctx := context.Background()
+	ctx := t.Context()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, proxyURL+"/",
 		strings.NewReader(body))
 	require.NoError(t, err)
@@ -242,7 +242,7 @@ func TestProxy_MalformedJSON(t *testing.T) {
 	defer cleanup()
 
 	body := `{invalid json`
-	ctx := context.Background()
+	ctx := t.Context()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, proxyURL+"/",
 		strings.NewReader(body))
 	require.NoError(t, err)
@@ -275,7 +275,7 @@ func TestProxy_RequestBodyTooLarge(t *testing.T) {
 
 	// Create a body larger than 1MB.
 	largeBody := strings.Repeat("x", 1<<20+1)
-	ctx := context.Background()
+	ctx := t.Context()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, proxyURL+"/",
 		strings.NewReader(largeBody))
 	require.NoError(t, err)
@@ -302,7 +302,7 @@ func TestProxy_UpstreamUnavailable(t *testing.T) {
 	defer cleanup()
 
 	body := `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`
-	ctx := context.Background()
+	ctx := t.Context()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, proxyURL+"/",
 		strings.NewReader(body))
 	require.NoError(t, err)
@@ -345,7 +345,7 @@ func TestProxy_GracefulShutdown(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	// Shutdown should succeed without errors.
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
 	err = srv.Shutdown(ctx)
@@ -369,7 +369,7 @@ func TestProxy_SSERequest(t *testing.T) {
 	proxyURL, cleanup := newTestProxy(t, upstream.URL)
 	defer cleanup()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, proxyURL+"/sse", nil)
 	require.NoError(t, err)
 	req.Header.Set("Accept", "text/event-stream")
@@ -405,7 +405,7 @@ func TestProxy_MissingMethod(t *testing.T) {
 	defer cleanup()
 
 	body := `{"jsonrpc":"2.0","id":1}`
-	ctx := context.Background()
+	ctx := t.Context()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, proxyURL+"/",
 		strings.NewReader(body))
 	require.NoError(t, err)
@@ -452,7 +452,7 @@ func TestProxy_MethodLogging(t *testing.T) {
 	defer cleanup()
 
 	body := `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"db-query"}}`
-	ctx := context.Background()
+	ctx := t.Context()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, proxyURL+"/",
 		strings.NewReader(body))
 	require.NoError(t, err)

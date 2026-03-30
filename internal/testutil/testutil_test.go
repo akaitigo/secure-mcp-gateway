@@ -1,7 +1,6 @@
 package testutil_test
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -73,7 +72,7 @@ func TestNewMockHydraServerActive(t *testing.T) {
 	server := testutil.NewMockHydraServer(true, "test-client")
 	defer server.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, server.URL+"/admin/oauth2/introspect", nil)
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -96,7 +95,7 @@ func TestNewMockHydraServerInactive(t *testing.T) {
 	server := testutil.NewMockHydraServer(false, "")
 	defer server.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, server.URL+"/admin/oauth2/introspect", nil)
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -122,7 +121,7 @@ func TestNewMockMCPServer(t *testing.T) {
 	})
 	defer server.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL, nil)
 	require.NoError(t, err)
 
