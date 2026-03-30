@@ -20,12 +20,16 @@ import (
 // maxRequestSize is the maximum allowed request body size (1MB).
 const maxRequestSize = 1 << 20 // 1MB
 
+// Middleware is a function that wraps an http.Handler.
+type Middleware func(http.Handler) http.Handler
+
 // Server is the MCP reverse proxy server.
 type Server struct {
 	upstreamURL *url.URL
 	httpServer  *http.Server
 	httpClient  *http.Client
 	logger      *slog.Logger
+	middlewares []Middleware
 }
 
 // Option configures the proxy server.
@@ -42,6 +46,14 @@ func WithLogger(logger *slog.Logger) Option {
 func WithHTTPClient(client *http.Client) Option {
 	return func(s *Server) {
 		s.httpClient = client
+	}
+}
+
+// WithMiddleware adds a middleware to the proxy server.
+// Middlewares are applied in the order they are added.
+func WithMiddleware(mw Middleware) Option {
+	return func(s *Server) {
+		s.middlewares = append(s.middlewares, mw)
 	}
 }
 
@@ -68,9 +80,15 @@ func New(listenAddr, upstreamMCPURL string, opts ...Option) (*Server, error) {
 	mux.HandleFunc("/health", s.handleHealth)
 	mux.HandleFunc("/", s.handleProxy)
 
+	// Apply middlewares in order (outermost first).
+	var handler http.Handler = mux
+	for i := len(s.middlewares) - 1; i >= 0; i-- {
+		handler = s.middlewares[i](handler)
+	}
+
 	s.httpServer = &http.Server{
 		Addr:              listenAddr,
-		Handler:           mux,
+		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      60 * time.Second,

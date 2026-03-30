@@ -51,6 +51,14 @@ func (c *Config) validate() error {
 		return fmt.Errorf("UPSTREAM_MCP_URL is not a valid URL: %w", err)
 	}
 
+	if c.HydraAdminURL == "" {
+		return errors.New("HYDRA_ADMIN_URL is required")
+	}
+
+	if _, err := url.ParseRequestURI(c.HydraAdminURL); err != nil {
+		return fmt.Errorf("HYDRA_ADMIN_URL is not a valid URL: %w", err)
+	}
+
 	return nil
 }
 
