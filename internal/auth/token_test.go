@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -117,7 +116,7 @@ func TestHydraIntrospector_ActiveToken(t *testing.T) {
 	introspector, err := NewHydraIntrospector(hydra.URL, nil)
 	require.NoError(t, err)
 
-	result, err := introspector.Introspect(context.Background(), "test-token")
+	result, err := introspector.Introspect(t.Context(), "test-token")
 	require.NoError(t, err)
 	assert.True(t, result.Active)
 	assert.Equal(t, "my-client", result.ClientID)
@@ -140,7 +139,7 @@ func TestHydraIntrospector_InactiveToken(t *testing.T) {
 	introspector, err := NewHydraIntrospector(hydra.URL, nil)
 	require.NoError(t, err)
 
-	result, err := introspector.Introspect(context.Background(), "expired-token")
+	result, err := introspector.Introspect(t.Context(), "expired-token")
 	require.NoError(t, err)
 	assert.False(t, result.Active)
 }
@@ -156,7 +155,7 @@ func TestHydraIntrospector_ServerError(t *testing.T) {
 	introspector, err := NewHydraIntrospector(hydra.URL, nil)
 	require.NoError(t, err)
 
-	_, err = introspector.Introspect(context.Background(), "test-token")
+	_, err = introspector.Introspect(t.Context(), "test-token")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "status 500")
 }
@@ -183,7 +182,7 @@ func TestHydraIntrospector_NetworkError(t *testing.T) {
 	introspector, err := NewHydraIntrospector("http://localhost:1", nil)
 	require.NoError(t, err)
 
-	_, err = introspector.Introspect(context.Background(), "test-token")
+	_, err = introspector.Introspect(t.Context(), "test-token")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "introspection request failed")
 }
@@ -196,7 +195,7 @@ func TestTokenInfoContext(t *testing.T) {
 		Scopes:   []string{"tools:read", "tools:call"},
 	}
 
-	ctx := WithTokenInfo(context.Background(), info)
+	ctx := WithTokenInfo(t.Context(), info)
 	retrieved := GetTokenInfo(ctx)
 
 	require.NotNil(t, retrieved)
@@ -207,7 +206,7 @@ func TestTokenInfoContext(t *testing.T) {
 func TestGetTokenInfo_Empty(t *testing.T) {
 	t.Parallel()
 
-	retrieved := GetTokenInfo(context.Background())
+	retrieved := GetTokenInfo(t.Context())
 	assert.Nil(t, retrieved)
 }
 

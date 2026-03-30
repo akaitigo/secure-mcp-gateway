@@ -27,7 +27,6 @@ Thumbs.db
 .env.development
 
 # Generated
-gen/
 dist/
 
 # Secrets
