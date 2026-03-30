@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/akaitigo/secure-mcp-gateway/internal/auth"
 	"github.com/akaitigo/secure-mcp-gateway/internal/config"
 	"github.com/akaitigo/secure-mcp-gateway/internal/proxy"
 )
@@ -26,7 +27,18 @@ func run() error {
 		return err
 	}
 
-	srv, err := proxy.New(cfg.ProxyListenAddr, cfg.UpstreamMCPURL)
+	// Set up OAuth2 token verification middleware.
+	introspector, err := auth.NewHydraIntrospector(cfg.HydraAdminURL, nil)
+	if err != nil {
+		return err
+	}
+	authMiddleware := auth.NewMiddleware(introspector,
+		auth.WithSkipPaths("/health"),
+	)
+
+	srv, err := proxy.New(cfg.ProxyListenAddr, cfg.UpstreamMCPURL,
+		proxy.WithMiddleware(authMiddleware.Handler),
+	)
 	if err != nil {
 		return err
 	}

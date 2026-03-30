@@ -69,14 +69,62 @@ func NewMockMCPServer(handler http.HandlerFunc) *httptest.Server {
 
 // NewMockHydraServer creates a mock ORY Hydra introspection endpoint.
 // If active is true, the token is valid; otherwise, it returns an inactive response.
+// The mock validates that requests are sent to the correct introspection path.
 func NewMockHydraServer(active bool, clientID string) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Validate introspection endpoint path.
+		if r.URL.Path != "/admin/oauth2/introspect" {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 
 		resp := map[string]interface{}{
 			"active": active,
 		}
 		if active {
+			resp["client_id"] = clientID
+			resp["scope"] = "tools:read tools:call"
+		}
+
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			http.Error(w, "failed to encode response", http.StatusInternalServerError)
+		}
+	}))
+}
+
+// NewMockHydraServerWithTokenValidation creates a mock ORY Hydra introspection endpoint
+// that validates a specific expected token and responds accordingly.
+func NewMockHydraServerWithTokenValidation(expectedToken, clientID string) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/admin/oauth2/introspect" {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+
+		token := r.FormValue("token")
+		w.Header().Set("Content-Type", "application/json")
+
+		resp := map[string]interface{}{
+			"active": token == expectedToken,
+		}
+		if token == expectedToken {
 			resp["client_id"] = clientID
 			resp["scope"] = "tools:read tools:call"
 		}

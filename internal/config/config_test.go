@@ -30,6 +30,7 @@ func TestLoad_Success(t *testing.T) {
 
 func TestLoad_Defaults(t *testing.T) {
 	t.Setenv("UPSTREAM_MCP_URL", "http://localhost:3001")
+	t.Setenv("HYDRA_ADMIN_URL", "http://localhost:4445")
 	// Clear optional env vars to test defaults.
 	t.Setenv("PROXY_LISTEN_ADDR", "")
 	t.Setenv("AUDIT_LOG_PATH", "")
@@ -57,4 +58,22 @@ func TestLoad_InvalidUpstreamMCPURL(t *testing.T) {
 	_, err := config.Load()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not a valid URL")
+}
+
+func TestLoad_MissingHydraAdminURL(t *testing.T) {
+	t.Setenv("UPSTREAM_MCP_URL", "http://localhost:3001")
+	t.Setenv("HYDRA_ADMIN_URL", "")
+
+	_, err := config.Load()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "HYDRA_ADMIN_URL is required")
+}
+
+func TestLoad_InvalidHydraAdminURL(t *testing.T) {
+	t.Setenv("UPSTREAM_MCP_URL", "http://localhost:3001")
+	t.Setenv("HYDRA_ADMIN_URL", "not-a-valid-url")
+
+	_, err := config.Load()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "HYDRA_ADMIN_URL is not a valid URL")
 }
