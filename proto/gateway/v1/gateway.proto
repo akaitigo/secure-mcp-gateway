@@ -9,24 +9,24 @@ syntax = "proto3";
 // ゲートウェイサービスのパッケージ。
 package gateway.v1;
 
-// ヘルスチェック用。
-import "google/protobuf/empty.proto";
-
+// Go: パッケージパス。
+option go_package = "github.com/akaitigo/secure-mcp-gateway/gen/gateway/v1;gatewayv1";
 // Java: 1メッセージ1ファイルに分割。
 option java_multiple_files = true;
 // Java: パッケージ名。
 option java_package = "gateway.v1";
-// Go: パッケージパス。
-option go_package = "github.com/akaitigo/secure-mcp-gateway/gen/gateway/v1;gatewayv1";
 
 // ゲートウェイの管理・監査 API を提供する。
 service GatewayService {
   // ヘルスチェックを実行する。
-  rpc Health(google.protobuf.Empty) returns (HealthResponse);
+  rpc Health(HealthRequest) returns (HealthResponse);
 
   // 監査ログを取得する。
   rpc ListAuditLogs(ListAuditLogsRequest) returns (ListAuditLogsResponse);
 }
+
+// Health のリクエスト。空メッセージ。
+message HealthRequest {}
 
 // Health のレスポンス。
 message HealthResponse {

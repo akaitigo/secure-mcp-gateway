@@ -15,8 +15,3 @@ breaking:
   use:
     - WIRE
   except: []
-
-managed:
-  override:
-    - file_option: java_multiple_files
-      value: true

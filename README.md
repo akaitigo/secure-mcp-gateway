@@ -34,6 +34,12 @@
 git clone https://github.com/akaitigo/secure-mcp-gateway.git
 cd secure-mcp-gateway
 
+# Set up environment variables
+cp .env.example .env
+
+# Start local development dependencies (ORY Hydra + OPA + mock MCP server)
+docker compose up -d
+
 # Build
 make build
 

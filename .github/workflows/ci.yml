@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache: true
+
+      - name: Install tools
+        run: |
+          go install mvdan.cc/gofumpt@latest
+          go install golang.org/x/tools/cmd/goimports@latest
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b "$(go env GOPATH)/bin" v1.64.8
+
+      - name: Install buf
+        uses: bufbuild/buf-setup-action@v1
+        with:
+          github_token: ${{ github.token }}
+
+      - name: Format check
+        run: |
+          make format
+          git diff --exit-code || { echo "ERROR: gofumpt/goimports changed files. Run 'make format' locally."; exit 1; }
+
+      - name: Tidy check
+        run: |
+          make tidy
+          git diff --exit-code go.mod go.sum || { echo "ERROR: go mod tidy changed files. Run 'make tidy' locally."; exit 1; }
+
+      - name: Lint
+        run: make lint
+
+      - name: Test
+        run: make test
+
+      - name: Build
+        run: make build
+
+      - name: buf lint
+        run: buf lint proto/
+
+      - name: Quality gate
+        run: make quality
