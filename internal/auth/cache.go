@@ -83,13 +83,29 @@ func (c *TokenCache) Get(token string) (*IntrospectionResult, bool) {
 }
 
 // Set stores an introspection result in the cache.
+// The cache entry TTL is the minimum of the configured TTL and the token's
+// remaining lifetime (derived from its exp claim). This prevents caching a
+// token beyond its actual expiration.
 func (c *TokenCache) Set(token string, result *IntrospectionResult) {
 	key := hashToken(token)
+
+	ttl := c.ttl
+	if result.ExpiresAt > 0 {
+		tokenExpiry := time.Unix(result.ExpiresAt, 0)
+		remaining := tokenExpiry.Sub(c.now())
+		if remaining <= 0 {
+			// Token is already expired; do not cache.
+			return
+		}
+		if remaining < ttl {
+			ttl = remaining
+		}
+	}
 
 	c.mu.Lock()
 	c.entries[key] = cacheEntry{
 		result:    result,
-		expiresAt: c.now().Add(c.ttl),
+		expiresAt: c.now().Add(ttl),
 	}
 	c.mu.Unlock()
 }

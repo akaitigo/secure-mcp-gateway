@@ -13,7 +13,6 @@ func TestLoad_Success(t *testing.T) {
 	t.Setenv("UPSTREAM_MCP_URL", "http://localhost:3001")
 	t.Setenv("PROXY_LISTEN_ADDR", ":9090")
 	t.Setenv("HYDRA_ADMIN_URL", "http://localhost:4445")
-	t.Setenv("OPA_URL", "http://localhost:8181")
 	t.Setenv("AUDIT_LOG_PATH", "/var/log/audit.log")
 	t.Setenv("GRPC_LISTEN_ADDR", ":50051")
 
@@ -23,7 +22,6 @@ func TestLoad_Success(t *testing.T) {
 	assert.Equal(t, "http://localhost:3001", cfg.UpstreamMCPURL)
 	assert.Equal(t, ":9090", cfg.ProxyListenAddr)
 	assert.Equal(t, "http://localhost:4445", cfg.HydraAdminURL)
-	assert.Equal(t, "http://localhost:8181", cfg.OPAURL)
 	assert.Equal(t, "/var/log/audit.log", cfg.AuditLogPath)
 	assert.Equal(t, ":50051", cfg.GRPCListenAddr)
 }

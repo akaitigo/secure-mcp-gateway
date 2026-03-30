@@ -1,6 +1,8 @@
 # secure-mcp-gateway
 
 > **WARNING: This project is under active development. Not ready for production use.**
+>
+> **MVP: ポリシー評価は未実装。認証済みユーザーは全ツールにアクセス可能。** OPAによるツール粒度の認可はPhase 2で対応予定。詳細は [ADR-003](docs/adr/0003-mvp-opa-deferred.md) を参照。
 
 企業内の機密データ（PostgreSQL/Redis）にAI Agentが安全にアクセスするための、ポリシー制御機能付きModel Context Protocol (MCP) ゲートウェイ。
 
@@ -8,7 +10,7 @@
 
 - **MCP Proxy**: MCP over HTTP/SSE リクエストの透過的な中継
 - **OAuth2 Token Validation**: ORY Hydra 連携による Bearer トークン検証
-- **Tool-level Authorization**: OPA によるツール呼び出し粒度の認可ポリシー
+- **Tool-level Authorization**: OPA によるツール呼び出し粒度の認可ポリシー（Phase 2で実装予定）
 - **Audit Logging**: 全アクセスの構造化ログ出力
 
 ## Architecture
@@ -112,7 +114,6 @@ make check
 |----------|----------|---------|-------------|
 | `HYDRA_ADMIN_URL` | Yes | - | ORY Hydra Admin API URL |
 | `HYDRA_PUBLIC_URL` | Yes | - | ORY Hydra Public API URL |
-| `OPA_URL` | Yes | - | OPA server URL |
 | `UPSTREAM_MCP_URL` | Yes | - | Upstream MCP server URL |
 | `PROXY_LISTEN_ADDR` | No | `:8080` | HTTP proxy listen address |
 | `AUDIT_LOG_PATH` | No | `stdout` | Audit log output path (file path or `stdout`) |
@@ -126,6 +127,7 @@ Key design decisions are documented in [`docs/adr/`](docs/adr/):
 
 - [ADR-001: MCP Transport Layer](docs/adr/0001-mcp-transport-layer.md) — HTTP/SSE を採用した理由
 - [ADR-002: Policy Engine](docs/adr/0002-policy-engine-opa.md) — OPA を採用した理由
+- [ADR-003: MVP OPA Deferred](docs/adr/0003-mvp-opa-deferred.md) — MVPではOPAポリシー評価を未実装とする決定
 
 ## Development
 

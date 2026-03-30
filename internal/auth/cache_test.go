@@ -162,6 +162,114 @@ func TestTokenCache_ExpiredEntryCleanup(t *testing.T) {
 	assert.Equal(t, 0, cache.Len())
 }
 
+func TestTokenCache_TokenExpClampsTTL(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+	cache := NewTokenCache(
+		WithCacheTTL(60*time.Second),
+		withNowFunc(func() time.Time { return now }),
+	)
+
+	// Token expires in 10 seconds, which is less than the 60s cache TTL.
+	result := &IntrospectionResult{
+		Active:    true,
+		ClientID:  "client-exp",
+		ExpiresAt: now.Add(10 * time.Second).Unix(),
+	}
+	cache.Set("token-exp", result)
+
+	// Should be present immediately.
+	got, ok := cache.Get("token-exp")
+	require.True(t, ok)
+	assert.Equal(t, "client-exp", got.ClientID)
+
+	// Advance 11 seconds — past token exp but within cache TTL.
+	now = now.Add(11 * time.Second)
+	_, ok = cache.Get("token-exp")
+	assert.False(t, ok, "expired token must not be returned from cache")
+}
+
+func TestTokenCache_AlreadyExpiredTokenNotCached(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+	cache := NewTokenCache(
+		WithCacheTTL(60*time.Second),
+		withNowFunc(func() time.Time { return now }),
+	)
+
+	// Token already expired 5 seconds ago.
+	result := &IntrospectionResult{
+		Active:    true,
+		ClientID:  "client-old",
+		ExpiresAt: now.Add(-5 * time.Second).Unix(),
+	}
+	cache.Set("token-old", result)
+
+	// Should not be cached at all.
+	_, ok := cache.Get("token-old")
+	assert.False(t, ok, "already-expired token must not be cached")
+	assert.Equal(t, 0, cache.Len())
+}
+
+func TestTokenCache_ExpLongerThanTTL(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+	cache := NewTokenCache(
+		WithCacheTTL(30*time.Second),
+		withNowFunc(func() time.Time { return now }),
+	)
+
+	// Token expires in 120 seconds, longer than 30s cache TTL.
+	result := &IntrospectionResult{
+		Active:    true,
+		ClientID:  "client-long",
+		ExpiresAt: now.Add(120 * time.Second).Unix(),
+	}
+	cache.Set("token-long", result)
+
+	// Should use cache TTL (30s), not token exp (120s).
+	now = now.Add(25 * time.Second)
+	got, ok := cache.Get("token-long")
+	require.True(t, ok)
+	assert.Equal(t, "client-long", got.ClientID)
+
+	// Past cache TTL.
+	now = now.Add(10 * time.Second)
+	_, ok = cache.Get("token-long")
+	assert.False(t, ok)
+}
+
+func TestTokenCache_ZeroExpUsesDefaultTTL(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+	cache := NewTokenCache(
+		WithCacheTTL(60*time.Second),
+		withNowFunc(func() time.Time { return now }),
+	)
+
+	// Token with no exp (zero value) should use default TTL.
+	result := &IntrospectionResult{
+		Active:   true,
+		ClientID: "client-noexp",
+	}
+	cache.Set("token-noexp", result)
+
+	// Should be present at 59 seconds.
+	now = now.Add(59 * time.Second)
+	got, ok := cache.Get("token-noexp")
+	require.True(t, ok)
+	assert.Equal(t, "client-noexp", got.ClientID)
+
+	// Expired at 61 seconds.
+	now = now.Add(2 * time.Second)
+	_, ok = cache.Get("token-noexp")
+	assert.False(t, ok)
+}
+
 func TestTokenCache_CustomTTL(t *testing.T) {
 	t.Parallel()
 
