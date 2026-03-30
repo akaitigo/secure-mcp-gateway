@@ -50,11 +50,13 @@ func run() error {
 	)
 
 	// Build proxy with middleware chain:
-	// RequestID -> Auth -> Audit -> Proxy handler
+	// RequestID -> Audit -> Auth -> Proxy handler
+	// Audit wraps Auth so that both ALLOW and DENY decisions are logged,
+	// ensuring 100% audit log coverage per PRD requirements.
 	srv, err := proxy.New(cfg.ProxyListenAddr, cfg.UpstreamMCPURL,
 		proxy.WithMiddleware(audit.RequestIDMiddleware),
-		proxy.WithMiddleware(authMiddleware.Handler),
 		proxy.WithMiddleware(auditMiddleware.Handler),
+		proxy.WithMiddleware(authMiddleware.Handler),
 	)
 	if err != nil {
 		return err

@@ -6,6 +6,10 @@ import (
 	"strings"
 )
 
+// auditClientIDHeader is the internal header name used to propagate client_id
+// to the audit middleware. This must match audit.AuditClientIDHeader.
+const auditClientIDHeader = "X-Audit-Client-Id"
+
 // Middleware provides HTTP middleware for OAuth2 token verification.
 type Middleware struct {
 	introspector Introspector
@@ -88,6 +92,7 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 				m.logger.Debug("token validated from cache",
 					"client_id", result.ClientID,
 				)
+				w.Header().Set(auditClientIDHeader, result.ClientID)
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
@@ -131,6 +136,9 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 			"client_id", result.ClientID,
 			"remote_addr", r.RemoteAddr,
 		)
+		// Set internal header for audit middleware to capture client_id
+		// across middleware boundaries (audit wraps auth externally).
+		w.Header().Set(auditClientIDHeader, result.ClientID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
