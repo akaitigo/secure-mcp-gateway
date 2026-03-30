@@ -1,0 +1,14 @@
+pre-commit:
+  parallel: true
+  commands:
+    lint:
+      run: make lint
+    format-check:
+      run: make format
+    test:
+      run: make test
+    archgate:
+      run: archgate check --staged
+      skip:
+        - merge
+        - rebase

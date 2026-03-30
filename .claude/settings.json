@@ -1,0 +1,75 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'INPUT=$(cat); FILE=$(echo \"$INPUT\" | jq -r \".file_path // empty\"); if [ -z \"$FILE\" ]; then exit 0; fi; BASENAME=$(basename \"$FILE\"); case \"$BASENAME\" in .golangci.yml|.golangci.yaml|Makefile) echo \"BLOCK: lint設定・ビルド設定の変更はADR承認が必須です\" >&2; exit 1;; .env|.env.local|.env.production|.env.staging|.env.development|credentials.json|secrets.yml|secrets.yaml|*.pem|*.key|*.p12|*.pfx) echo \"BLOCK: 機密ファイルの編集はブロックされました。.env.exampleを更新してください\" >&2; exit 1;; esac; case \"$FILE\" in *.proto) echo \"INFO: protoファイル変更検出。PostToolUseでbuf lint実行します\";; esac'"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'INPUT=$(cat); CMD=$(echo \"$INPUT\" | jq -r \".command // empty\"); if echo \"$CMD\" | grep -qE \"(rm -rf|DROP TABLE|DELETE FROM|git push --force|git reset --hard)\"; then echo \"BLOCK: 破壊的コマンドはブロックされました\" >&2; exit 2; fi; if echo \"$CMD\" | grep -qE \"--no-verify\"; then echo \"BLOCK: --no-verify はブロックされました。フックをスキップしないでください\" >&2; exit 2; fi'"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/scripts/post-lint.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash -c 'INPUT=$(cat); FILE=$(echo \"$INPUT\" | jq -r \".file_path // empty\"); if [ -z \"$FILE\" ]; then exit 0; fi; if [[ \"$FILE\" == *.proto ]]; then PROTO_DIR=$(dirname \"$FILE\"); ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd); cd \"$ROOT\"; buf format -w 2>&1 | head -5; buf lint 2>&1 | head -20; fi'"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'cp CLAUDE.md CLAUDE.backup.md 2>/dev/null || true'"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "make check && make quality"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'if ! command -v buf &>/dev/null; then echo \"WARN: buf not installed, skipping breaking change check\"; exit 0; fi; if [ ! -f buf.yaml ]; then echo \"WARN: buf.yaml not found\"; exit 0; fi; echo \"--- buf breaking チェック ---\"; if git rev-parse --verify main &>/dev/null; then buf breaking --against .git#branch=main 2>&1; else echo \"INFO: main branch not found, skipping breaking change check\"; fi'"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'if [ ! -d test/contract ]; then echo \"WARN: test/contract/ not found, skipping contract tests\"; exit 0; fi; echo \"--- 契約テスト実行 ---\"; for f in test/contract/*.sh; do [ -f \"$f\" ] && bash \"$f\" || exit $?; done; echo \"--- 契約テスト完了 ---\"'"
+          }
+        ]
+      }
+    ]
+  }
+}

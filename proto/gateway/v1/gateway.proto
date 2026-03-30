@@ -1,0 +1,69 @@
+// =============================================================================
+// secure-mcp-gateway gRPC サービス定義
+//
+// MCP Gateway のポリシー管理・監査ログ取得用の内部 gRPC API。
+// =============================================================================
+
+syntax = "proto3";
+
+// ゲートウェイサービスのパッケージ。
+package gateway.v1;
+
+// ヘルスチェック用。
+import "google/protobuf/empty.proto";
+
+// Java: 1メッセージ1ファイルに分割。
+option java_multiple_files = true;
+// Java: パッケージ名。
+option java_package = "gateway.v1";
+// Go: パッケージパス。
+option go_package = "github.com/akaitigo/secure-mcp-gateway/gen/gateway/v1;gatewayv1";
+
+// ゲートウェイの管理・監査 API を提供する。
+service GatewayService {
+  // ヘルスチェックを実行する。
+  rpc Health(google.protobuf.Empty) returns (HealthResponse);
+
+  // 監査ログを取得する。
+  rpc ListAuditLogs(ListAuditLogsRequest) returns (ListAuditLogsResponse);
+}
+
+// Health のレスポンス。
+message HealthResponse {
+  // サービスのステータス。"SERVING" or "NOT_SERVING"。
+  string status = 1;
+}
+
+// ListAuditLogs のリクエスト。
+message ListAuditLogsRequest {
+  // 1ページあたりの最大件数。デフォルト: 20, 最大: 100。
+  int32 page_size = 1;
+  // 次ページトークン。
+  string page_token = 2;
+}
+
+// ListAuditLogs のレスポンス。
+message ListAuditLogsResponse {
+  // 監査ログの一覧。
+  repeated AuditLog audit_logs = 1;
+  // 次ページトークン。
+  string next_page_token = 2;
+  // 全件数。
+  int32 total_count = 3;
+}
+
+// 監査ログのエントリ。
+message AuditLog {
+  // ログの一意識別子。
+  string id = 1;
+  // リクエスト元のクライアントID。
+  string client_id = 2;
+  // 呼び出されたMCPツール名。
+  string tool_name = 3;
+  // 認可の結果。"ALLOW" or "DENY"。
+  string decision = 4;
+  // リクエスト日時（RFC 3339形式）。
+  string timestamp = 5;
+  // 追加のメタデータ。
+  map<string, string> metadata = 6;
+}

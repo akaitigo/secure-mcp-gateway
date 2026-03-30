@@ -1,0 +1,22 @@
+version: v2
+
+modules:
+  - path: proto
+    name: buf.build/akaitigo/secure-mcp-gateway
+
+lint:
+  use:
+    - STANDARD
+    - COMMENTS
+  except: []
+  disallow_comment_ignores: true
+
+breaking:
+  use:
+    - WIRE
+  except: []
+
+managed:
+  override:
+    - file_option: java_multiple_files
+      value: true

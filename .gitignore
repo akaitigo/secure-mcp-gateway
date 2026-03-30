@@ -1,0 +1,40 @@
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.out
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.production
+.env.staging
+.env.development
+
+# Generated
+gen/
+dist/
+
+# Secrets
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+secrets.yml
+secrets.yaml
