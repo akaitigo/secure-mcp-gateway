@@ -1,0 +1,77 @@
+services:
+  # ORY Hydra - OAuth2/OIDC provider
+  hydra:
+    image: oryd/hydra:v2.2
+    ports:
+      - "4444:4444" # Public API
+      - "4445:4445" # Admin API
+    command: serve all --dev
+    environment:
+      - DSN=memory
+      - URLS_SELF_ISSUER=http://localhost:4444/
+      - URLS_CONSENT=http://localhost:3000/consent
+      - URLS_LOGIN=http://localhost:3000/login
+      - URLS_LOGOUT=http://localhost:3000/logout
+      - SECRETS_SYSTEM=dev-only-not-for-production # local dev only
+      - LOG_LEVEL=info
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:4445/health/alive"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # OPA - Open Policy Agent
+  opa:
+    image: openpolicyagent/opa:latest
+    ports:
+      - "8181:8181"
+    command:
+      - run
+      - --server
+      - --log-level=info
+      - --set=decision_logs.console=true
+      - /policies
+    volumes:
+      - ./policies:/policies:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:8181/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Mock upstream MCP server (for local development)
+  mock-mcp:
+    image: python:3.12-slim
+    ports:
+      - "3001:3001"
+    command: >
+      python -c "
+      from http.server import HTTPServer, BaseHTTPRequestHandler
+      import json
+
+      class Handler(BaseHTTPRequestHandler):
+          def do_POST(self):
+              length = int(self.headers.get('Content-Length', 0))
+              body = self.rfile.read(length) if length else b'{}'
+              data = json.loads(body)
+              response = {
+                  'jsonrpc': '2.0',
+                  'id': data.get('id', 1),
+                  'result': {'tools': [{'name': 'mock-tool', 'description': 'A mock tool for testing'}]}
+              }
+              self.send_response(200)
+              self.send_header('Content-Type', 'application/json')
+              self.end_headers()
+              self.wfile.write(json.dumps(response).encode())
+
+          def do_GET(self):
+              self.send_response(200)
+              self.send_header('Content-Type', 'application/json')
+              self.end_headers()
+              self.wfile.write(json.dumps({'status': 'ok'}).encode())
+
+      HTTPServer(('0.0.0.0', 3001), Handler).serve_forever()
+      "
+    restart: unless-stopped

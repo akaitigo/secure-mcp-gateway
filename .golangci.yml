@@ -13,7 +13,7 @@ linters:
     - bodyclose
     - durationcheck
     - errcheck
-    - exportloopref
+    - copyloopvar
     - govet
     - nilerr
     - noctx
@@ -52,7 +52,7 @@ linters:
     - nestif
 
     # テスト
-    - tenv
+    - usetesting
     - tparallel
 
 linters-settings:

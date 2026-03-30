@@ -110,7 +110,7 @@ OSS (Community Edition) + SaaS (監査ログ・ダッシュボード・SSO統合
 
 ## 未解決事項
 
-- [ ] MCP over HTTP/SSE vs MCP over stdio — プロキシ対象のトランスポート層の決定
-- [ ] OPA vs OpenFGA — ポリシーエンジンの最終選定（MVPではOPAを採用し、v2でOpenFGAも検討）
-- [ ] TypeScriptサイドカーのデプロイ方式 — 同一プロセス内埋め込み vs 別コンテナ
-- [ ] 監査ログのストレージ — ファイル vs DB vs 外部サービス（MVPではファイル出力）
+- MCP over HTTP/SSE vs MCP over stdio — プロキシ対象のトランスポート層の決定 (ADR-001で決定予定)
+- OPA vs OpenFGA — ポリシーエンジンの最終選定（MVPではOPAを採用し、v2でOpenFGAも検討）(ADR-002で決定予定)
+- TypeScriptサイドカーのデプロイ方式 — 同一プロセス内埋め込み vs 別コンテナ
+- 監査ログのストレージ — ファイル vs DB vs 外部サービス（MVPではファイル出力）
