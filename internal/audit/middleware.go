@@ -43,6 +43,11 @@ func NewMiddleware(logger *Logger, opts ...MiddlewareOption) *Middleware {
 	return m
 }
 
+// AuditClientIDHeader is an internal header used to propagate client_id
+// from auth middleware to audit middleware across middleware boundaries.
+// This header is stripped from the final response and never sent to clients.
+const AuditClientIDHeader = "X-Audit-Client-Id"
+
 // statusRecorder captures the HTTP status code written by downstream handlers.
 type statusRecorder struct {
 	http.ResponseWriter
@@ -57,6 +62,9 @@ func (r *statusRecorder) WriteHeader(code int) {
 // Handler wraps the given handler with audit logging.
 // It records tool invocations with client_id, tool_name, decision, and request_id.
 // Sensitive information (tokens, request bodies) is never logged.
+//
+// When placed outside the auth middleware, client_id is obtained from the
+// X-Audit-Client-Id internal header set by the auth middleware.
 func (m *Middleware) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Skip audit for configured paths (e.g., /health).
@@ -84,9 +92,14 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 			decision = DecisionDeny
 		}
 
-		// Extract client_id from context (set by auth middleware).
+		// Extract client_id: first try internal header (set by auth middleware),
+		// then fall back to request context.
 		clientID := unknownValue
-		if info := auth.GetTokenInfo(r.Context()); info != nil {
+		if headerID := rec.Header().Get(AuditClientIDHeader); headerID != "" {
+			clientID = headerID
+			// Strip internal header so it is never sent to the client.
+			rec.Header().Del(AuditClientIDHeader)
+		} else if info := auth.GetTokenInfo(r.Context()); info != nil {
 			clientID = info.ClientID
 		}
 
