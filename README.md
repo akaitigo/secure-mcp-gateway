@@ -1,8 +1,6 @@
 # secure-mcp-gateway
 
-> **WARNING: This project is under active development. Not ready for production use.**
->
-> **MVP: ポリシー評価は未実装。認証済みユーザーは全ツールにアクセス可能。** OPAによるツール粒度の認可はPhase 2で対応予定。詳細は [ADR-003](docs/adr/0003-mvp-opa-deferred.md) を参照。
+> **NOTE: MVP — ポリシー評価は未実装。認証済みユーザーは全ツールにアクセス可能。** OPAによるツール粒度の認可はPhase 2で対応予定。詳細は [ADR-003](docs/adr/0003-mvp-opa-deferred.md) を参照。
 
 企業内の機密データ（PostgreSQL/Redis）にAI Agentが安全にアクセスするための、ポリシー制御機能付きModel Context Protocol (MCP) ゲートウェイ。
 

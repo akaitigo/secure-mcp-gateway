@@ -1,13 +1,20 @@
 # Changelog
 
-## v1.0.0 (2026-03-31)
+## v1.0.0 (2026-04-01)
 
-### Features
-- feat #5: add integration tests, ADRs, and improve documentation
-- feat #4: implement audit logging for MCP tool invocations
-- feat #3: implement OAuth token verification middleware with ORY Hydra integration
-- feat #2: implement MCP proxy with JSON-RPC routing, SSE streaming, and input validation
-- feat #1: CI/CD, test framework, and local dev environment
+### Initial Release
 
-### Infrastructure
+- chore: upgrade dependencies (#20)
+- build(deps): bump actions/checkout from 4 to 6 (#14)
+- harden: migrate golangci-lint v2 and fix security/lint warnings (#19)
+- fix: forward query string to upstream in proxy and SSE handlers (#13) (#18)
+- fix: use YAML literal block scalar for mock-mcp inline Python (#16) (#17)
+- fix: remove unused OPA_URL config and respect token exp in cache TTL
+- docs: harvest retrospective
+- docs: add CHANGELOG.md for v1.0.0
+- feat #5: integration tests, ADRs, and documentation (#12)
+- feat #4: audit logging (rebased on main) (#11)
+- feat #3: OAuth token verification middleware (rebased on main) (#8)
+- feat #2: implement MCP proxy with JSON-RPC routing, SSE streaming, and input validation (#7)
+- feat #1: CI/CD, test framework, and local dev environment (#6)
 - Initial project scaffold from idea #1
