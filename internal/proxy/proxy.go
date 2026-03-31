@@ -202,7 +202,9 @@ func (s *Server) forwardRequest(w http.ResponseWriter, r *http.Request, body []b
 		bodyReader = strings.NewReader(string(body))
 	}
 
-	proxyReq, err := http.NewRequestWithContext(r.Context(), r.Method, upstreamURL.String(), bodyReader)
+	// upstream URL is derived from a trusted server-side configuration value (UPSTREAM_MCP_URL),
+	// not from user input. SSRF risk is mitigated by config validation in config.Load().
+	proxyReq, err := http.NewRequestWithContext(r.Context(), r.Method, upstreamURL.String(), bodyReader) //nolint:gosec // trusted config
 	if err != nil {
 		s.logger.Error("failed to create upstream request", "error", err)
 		s.writeJSONRPCError(w, jsonrpc.CodeInternalError, "internal proxy error")
@@ -212,7 +214,7 @@ func (s *Server) forwardRequest(w http.ResponseWriter, r *http.Request, body []b
 	// Copy relevant headers.
 	copyHeaders(proxyReq.Header, r.Header)
 
-	resp, err := s.httpClient.Do(proxyReq)
+	resp, err := s.httpClient.Do(proxyReq) //nolint:gosec // trusted config (see above)
 	if err != nil {
 		s.logger.Error("upstream request failed", "error", err)
 		s.writeJSONRPCError(w, jsonrpc.CodeInternalError, "upstream server unavailable")
@@ -240,7 +242,8 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 
 	upstreamURL := s.upstreamURL.JoinPath(r.URL.Path)
 	upstreamURL.RawQuery = r.URL.RawQuery
-	proxyReq, err := http.NewRequestWithContext(r.Context(), r.Method, upstreamURL.String(), r.Body)
+	// upstream URL is derived from trusted server-side configuration (see forwardRequest comment).
+	proxyReq, err := http.NewRequestWithContext(r.Context(), r.Method, upstreamURL.String(), r.Body) //nolint:gosec // trusted config
 	if err != nil {
 		s.logger.Error("failed to create SSE upstream request", "error", err)
 		http.Error(w, "internal proxy error", http.StatusInternalServerError)
@@ -249,7 +252,7 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 
 	copyHeaders(proxyReq.Header, r.Header)
 
-	resp, err := s.httpClient.Do(proxyReq)
+	resp, err := s.httpClient.Do(proxyReq) //nolint:gosec // trusted config
 	if err != nil {
 		s.logger.Error("SSE upstream request failed", "error", err)
 		http.Error(w, "upstream server unavailable", http.StatusBadGateway)

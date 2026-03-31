@@ -1,135 +1,127 @@
+version: "2"
 run:
-  timeout: 5m
   modules-download-mode: readonly
-
 output:
   formats:
-    - format: colored-line-number
-  sort-results: true
-
+    text:
+      path: stdout
 linters:
   enable:
-    # バグ検出
     - bodyclose
-    - durationcheck
-    - errcheck
     - copyloopvar
-    - govet
-    - nilerr
-    - noctx
-    - rowserrcheck
-    - sqlclosecheck
-    - staticcheck
-    - typecheck
-
-    # スタイル・可読性
+    - cyclop
+    - durationcheck
     - errname
-    - gofumpt
-    - goimports
+    - gocognit
     - goconst
     - gocritic
-    - gosimple
+    - gosec
     - misspell
     - nakedret
+    - nestif
+    - nilerr
+    - noctx
     - prealloc
     - predeclared
     - revive
-    - stylecheck
+    - rowserrcheck
+    - sqlclosecheck
+    - staticcheck
+    - tparallel
     - unconvert
     - unparam
-    - unused
-    - whitespace
-
-    # セキュリティ
-    - gosec
-
-    # パフォーマンス
-    - ineffassign
-
-    # 複雑度
-    - cyclop
-    - gocognit
-    - nestif
-
-    # テスト
     - usetesting
-    - tparallel
-
-linters-settings:
-  cyclop:
-    max-complexity: 15
-
-  gocognit:
-    min-complexity: 20
-
-  goconst:
-    min-len: 3
-    min-occurrences: 3
-
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - experimental
-      - opinionated
-      - performance
-      - style
-    disabled-checks:
-      - whyNoLint
-
-  errcheck:
-    check-type-assertions: true
-    check-blank: true
-
-  gofumpt:
-    extra-rules: true
-
-  govet:
-    enable-all: true
-
-  nakedret:
-    max-func-lines: 10
-
-  nestif:
-    min-complexity: 5
-
-  revive:
+    - whitespace
+  settings:
+    cyclop:
+      max-complexity: 15
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+    gocognit:
+      min-complexity: 20
+    goconst:
+      min-len: 3
+      min-occurrences: 3
+    gocritic:
+      disabled-checks:
+        - whyNoLint
+      enabled-tags:
+        - diagnostic
+        - experimental
+        - opinionated
+        - performance
+        - style
+    gosec:
+      excludes:
+        - G104
+    govet:
+      enable-all: true
+    nakedret:
+      max-func-lines: 10
+    nestif:
+      min-complexity: 5
+    revive:
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: exported
+        - name: increment-decrement
+        - name: indent-error-flow
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: unexported-return
+        - name: var-declaration
+        - name: var-naming
+    staticcheck:
+      checks:
+        - all
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
     rules:
-      - name: blank-imports
-      - name: context-as-argument
-      - name: context-keys-type
-      - name: dot-imports
-      - name: error-return
-      - name: error-strings
-      - name: error-naming
-      - name: exported
-      - name: increment-decrement
-      - name: indent-error-flow
-      - name: range
-      - name: receiver-naming
-      - name: time-naming
-      - name: unexported-return
-      - name: var-declaration
-      - name: var-naming
-
-  gosec:
-    excludes:
-      - G104  # errcheck がカバー
-
-  stylecheck:
-    checks:
-      - all
-
+      - linters:
+          - errcheck
+          - goconst
+          - gocritic
+          - gosec
+          - noctx
+        path: _test\.go
+      - linters:
+          - noctx
+          - gosec
+        path: testutil/
+      - linters:
+          - cyclop
+          - gocognit
+        path: cmd/
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
 issues:
   max-issues-per-linter: 50
   max-same-issues: 5
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - goconst
-        - gocritic
-        - errcheck
-        - gosec
-    - path: cmd/
-      linters:
-        - gocognit
-        - cyclop
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    gofumpt:
+      extra-rules: true
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

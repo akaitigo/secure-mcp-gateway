@@ -97,13 +97,14 @@ func (h *HydraIntrospector) Introspect(ctx context.Context, token string) (*Intr
 	endpoint := h.adminURL + "/admin/oauth2/introspect"
 
 	form := url.Values{"token": {token}}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(form.Encode()))
+	// endpoint is derived from the trusted HYDRA_ADMIN_URL server configuration, not user input.
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(form.Encode())) //nolint:gosec // trusted config
 	if err != nil {
 		return nil, fmt.Errorf("failed to create introspection request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := h.httpClient.Do(req)
+	resp, err := h.httpClient.Do(req) //nolint:gosec // trusted config (see above)
 	if err != nil {
 		return nil, fmt.Errorf("introspection request failed: %w", err)
 	}

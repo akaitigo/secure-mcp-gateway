@@ -56,14 +56,15 @@ func NewLoggerWithWriter(w io.Writer, store *Store) *Logger {
 // Log writes an audit entry to both the structured logger and the in-memory store.
 // Sensitive information (tokens, request bodies) is never included.
 func (l *Logger) Log(entry *Entry) {
-	attrs := []slog.Attr{
+	attrs := make([]slog.Attr, 0, 6+len(entry.Metadata))
+	attrs = append(attrs,
 		slog.String("audit_id", entry.ID),
 		slog.String("client_id", entry.ClientID),
 		slog.String("tool_name", entry.ToolName),
 		slog.String("decision", string(entry.Decision)),
 		slog.String("request_id", entry.RequestID),
 		slog.String("timestamp", entry.Timestamp),
-	}
+	)
 
 	for k, v := range entry.Metadata {
 		attrs = append(attrs, slog.String("meta."+k, v))
