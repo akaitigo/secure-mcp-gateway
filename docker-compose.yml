@@ -46,32 +46,33 @@ services:
     image: python:3.12-slim
     ports:
       - "3001:3001"
-    command: >
-      python -c "
-      from http.server import HTTPServer, BaseHTTPRequestHandler
-      import json
+    command:
+      - python
+      - -c
+      - |
+        from http.server import HTTPServer, BaseHTTPRequestHandler
+        import json
 
-      class Handler(BaseHTTPRequestHandler):
-          def do_POST(self):
-              length = int(self.headers.get('Content-Length', 0))
-              body = self.rfile.read(length) if length else b'{}'
-              data = json.loads(body)
-              response = {
-                  'jsonrpc': '2.0',
-                  'id': data.get('id', 1),
-                  'result': {'tools': [{'name': 'mock-tool', 'description': 'A mock tool for testing'}]}
-              }
-              self.send_response(200)
-              self.send_header('Content-Type', 'application/json')
-              self.end_headers()
-              self.wfile.write(json.dumps(response).encode())
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                length = int(self.headers.get('Content-Length', 0))
+                body = self.rfile.read(length) if length else b'{}'
+                data = json.loads(body)
+                response = {
+                    'jsonrpc': '2.0',
+                    'id': data.get('id', 1),
+                    'result': {'tools': [{'name': 'mock-tool', 'description': 'A mock tool for testing'}]}
+                }
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps(response).encode())
 
-          def do_GET(self):
-              self.send_response(200)
-              self.send_header('Content-Type', 'application/json')
-              self.end_headers()
-              self.wfile.write(json.dumps({'status': 'ok'}).encode())
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'status': 'ok'}).encode())
 
-      HTTPServer(('0.0.0.0', 3001), Handler).serve_forever()
-      "
+        HTTPServer(('0.0.0.0', 3001), Handler).serve_forever()
     restart: unless-stopped
