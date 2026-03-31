@@ -195,6 +195,7 @@ func (s *Server) handleProxy(w http.ResponseWriter, r *http.Request) {
 // forwardRequest sends the request to the upstream MCP server.
 func (s *Server) forwardRequest(w http.ResponseWriter, r *http.Request, body []byte) {
 	upstreamURL := s.upstreamURL.JoinPath(r.URL.Path)
+	upstreamURL.RawQuery = r.URL.RawQuery
 
 	var bodyReader io.Reader
 	if len(body) > 0 {
@@ -238,6 +239,7 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 	}
 
 	upstreamURL := s.upstreamURL.JoinPath(r.URL.Path)
+	upstreamURL.RawQuery = r.URL.RawQuery
 	proxyReq, err := http.NewRequestWithContext(r.Context(), r.Method, upstreamURL.String(), r.Body)
 	if err != nil {
 		s.logger.Error("failed to create SSE upstream request", "error", err)
