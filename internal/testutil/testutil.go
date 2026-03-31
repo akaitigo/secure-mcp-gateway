@@ -113,12 +113,12 @@ func NewMockHydraServerWithTokenValidation(expectedToken, clientID string) *http
 			return
 		}
 
-		if err := r.ParseForm(); err != nil {
+		if err := r.ParseForm(); err != nil { //nolint:gosec // test mock, no real request body
 			http.Error(w, "bad request", http.StatusBadRequest)
 			return
 		}
 
-		token := r.FormValue("token")
+		token := r.FormValue("token") //nolint:gosec // test mock
 		w.Header().Set("Content-Type", "application/json")
 
 		resp := map[string]interface{}{

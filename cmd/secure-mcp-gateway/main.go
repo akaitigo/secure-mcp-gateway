@@ -64,7 +64,8 @@ func run() error {
 
 	// Start gRPC management server.
 	grpcSrv := grpcserver.New(auditStore)
-	grpcLn, err := net.Listen("tcp", cfg.GRPCListenAddr)
+	var lc net.ListenConfig
+	grpcLn, err := lc.Listen(context.Background(), "tcp", cfg.GRPCListenAddr)
 	if err != nil {
 		return err
 	}

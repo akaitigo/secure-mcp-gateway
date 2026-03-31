@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -149,8 +150,16 @@ func writeUnauthorized(w http.ResponseWriter, description string) {
 	w.Header().Set("WWW-Authenticate", `Bearer error="invalid_token", error_description="`+description+`"`)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusUnauthorized)
+
+	resp := struct {
+		Error   string `json:"error"`
+		Message string `json:"message"`
+	}{
+		Error:   "unauthorized",
+		Message: description,
+	}
 	//nolint:errcheck // best-effort write to response
-	w.Write([]byte(`{"error":"unauthorized","message":"` + description + `"}`))
+	json.NewEncoder(w).Encode(resp)
 }
 
 // parseScopes splits a space-separated scope string into a slice.
