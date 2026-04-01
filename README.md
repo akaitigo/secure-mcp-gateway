@@ -111,7 +111,6 @@ make check
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `HYDRA_ADMIN_URL` | Yes | - | ORY Hydra Admin API URL |
-| `HYDRA_PUBLIC_URL` | Yes | - | ORY Hydra Public API URL |
 | `UPSTREAM_MCP_URL` | Yes | - | Upstream MCP server URL |
 | `PROXY_LISTEN_ADDR` | No | `:8080` | HTTP proxy listen address |
 | `AUDIT_LOG_PATH` | No | `stdout` | Audit log output path (file path or `stdout`) |
