@@ -13,6 +13,11 @@ import (
 // unknownValue is the fallback used when client ID or tool name cannot be determined.
 const unknownValue = "unknown"
 
+// maxRequestSize is the maximum allowed request body size (1MB).
+// This must be enforced before any io.ReadAll to prevent memory
+// exhaustion from oversized payloads.
+const maxRequestSize = 1 << 20
+
 // Middleware provides HTTP middleware for audit logging of MCP tool invocations.
 type Middleware struct {
 	logger    *Logger
@@ -78,6 +83,11 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+
+		// Enforce body size limit before any io.ReadAll to prevent
+		// memory exhaustion. Without this, an attacker could send an
+		// arbitrarily large body that extractToolName would fully buffer.
+		r.Body = http.MaxBytesReader(w, r.Body, maxRequestSize)
 
 		// Read body to extract tool name, then restore it for downstream.
 		toolName := extractToolName(r)

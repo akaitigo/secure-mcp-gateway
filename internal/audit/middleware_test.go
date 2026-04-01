@@ -3,6 +3,7 @@ package audit
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -229,4 +230,36 @@ func TestAuditMiddleware_BodyPreservedForDownstream(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	assert.Equal(t, "tools/list", receivedMethod)
+}
+
+func TestAuditMiddleware_OversizedBodyRejected(t *testing.T) {
+	t.Parallel()
+
+	mw, _, store := newTestMiddleware(t)
+
+	var downstreamBodySize int
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		downstreamBodySize = len(body)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	handler := mw.Handler(inner)
+
+	// 1MB + 1 byte exceeds the maxRequestSize limit.
+	oversizedBody := strings.Repeat("x", 1<<20+1)
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(oversizedBody))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	// The MaxBytesReader should prevent the full body from being read.
+	assert.LessOrEqual(t, downstreamBodySize, 1<<20,
+		"downstream should not receive more than 1MB of body data")
+
+	// Audit should still log with unknownValue tool name (body was too large to parse).
+	assert.Equal(t, 1, store.Count())
+	entries, _ := store.List(0, 1)
+	require.Len(t, entries, 1)
+	assert.Equal(t, unknownValue, entries[0].ToolName)
 }
