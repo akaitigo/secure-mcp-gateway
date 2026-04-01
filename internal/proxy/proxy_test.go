@@ -537,3 +537,75 @@ func TestProxy_SSEQueryStringForwarding(t *testing.T) {
 	assert.Contains(t, receivedQuery, "cursor=xyz")
 	assert.Contains(t, receivedQuery, "transport=sse")
 }
+
+func TestProxy_AuthorizationHeaderNotForwarded(t *testing.T) {
+	t.Parallel()
+
+	var receivedAuthHeader string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedAuthHeader = r.Header.Get("Authorization")
+
+		w.Header().Set("Content-Type", "application/json")
+		err := json.NewEncoder(w).Encode(map[string]interface{}{
+			"jsonrpc": "2.0",
+			"id":      1,
+			"result":  map[string]interface{}{},
+		})
+		require.NoError(t, err)
+	}))
+	defer upstream.Close()
+
+	proxyURL, cleanup := newTestProxy(t, upstream.URL)
+	defer cleanup()
+
+	body := `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`
+	ctx := t.Context()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, proxyURL+"/",
+		strings.NewReader(body))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer super-secret-token")
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Empty(t, receivedAuthHeader,
+		"Authorization header must not be forwarded to upstream")
+}
+
+func TestProxy_SSEAuthorizationHeaderNotForwarded(t *testing.T) {
+	t.Parallel()
+
+	var receivedAuthHeader string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedAuthHeader = r.Header.Get("Authorization")
+
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("data: {\"event\":\"test\"}\n\n"))
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+	}))
+	defer upstream.Close()
+
+	proxyURL, cleanup := newTestProxy(t, upstream.URL)
+	defer cleanup()
+
+	ctx := t.Context()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, proxyURL+"/sse", nil)
+	require.NoError(t, err)
+	req.Header.Set("Accept", "text/event-stream")
+	req.Header.Set("Authorization", "Bearer sse-secret-token")
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Empty(t, receivedAuthHeader,
+		"Authorization header must not be forwarded to upstream via SSE")
+}
