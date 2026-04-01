@@ -318,9 +318,11 @@ func isMaxBytesError(err error) bool {
 	return errors.As(err, &maxBytesErr)
 }
 
-// copyHeaders copies HTTP headers, excluding hop-by-hop headers.
+// copyHeaders copies HTTP headers, excluding hop-by-hop and
+// security-sensitive headers that must not be forwarded to upstream.
 func copyHeaders(dst, src http.Header) {
-	hopByHop := map[string]bool{
+	excluded := map[string]bool{
+		// Hop-by-hop headers (RFC 2616 §13.5.1).
 		"Connection":          true,
 		"Keep-Alive":          true,
 		"Proxy-Authenticate":  true,
@@ -329,10 +331,14 @@ func copyHeaders(dst, src http.Header) {
 		"Trailer":             true,
 		"Transfer-Encoding":   true,
 		"Upgrade":             true,
+		// Security: the Authorization header carries the client's Bearer
+		// token for gateway authentication. Forwarding it to upstream
+		// would leak credentials to an external service.
+		"Authorization": true,
 	}
 
 	for key, values := range src {
-		if hopByHop[key] {
+		if excluded[key] {
 			continue
 		}
 		for _, value := range values {
