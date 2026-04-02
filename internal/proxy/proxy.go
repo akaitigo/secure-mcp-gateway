@@ -25,11 +25,12 @@ type Middleware func(http.Handler) http.Handler
 
 // Server is the MCP reverse proxy server.
 type Server struct {
-	upstreamURL *url.URL
-	httpServer  *http.Server
-	httpClient  *http.Client
-	logger      *slog.Logger
-	middlewares []Middleware
+	upstreamURL   *url.URL
+	httpServer    *http.Server
+	httpClient    *http.Client
+	sseHTTPClient *http.Client // dedicated client for SSE (no timeout)
+	logger        *slog.Logger
+	middlewares   []Middleware
 }
 
 // Option configures the proxy server.
@@ -70,6 +71,12 @@ func New(listenAddr, upstreamMCPURL string, opts ...Option) (*Server, error) {
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
+		// SSE connections are long-lived streams; a finite Timeout would kill
+		// the connection mid-stream. Use Timeout=0 (no deadline) and rely on
+		// the client's request context for cancellation.
+		sseHTTPClient: &http.Client{
+			Timeout: 0,
+		},
 	}
 
 	for _, opt := range opts {
@@ -91,8 +98,11 @@ func New(listenAddr, upstreamMCPURL string, opts ...Option) (*Server, error) {
 		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      60 * time.Second,
-		IdleTimeout:       120 * time.Second,
+		// WriteTimeout is intentionally 0 (disabled) to support long-lived
+		// SSE streaming connections. Per-request timeouts are handled via
+		// request context instead.
+		WriteTimeout: 0,
+		IdleTimeout:  120 * time.Second,
 	}
 
 	return s, nil
@@ -252,7 +262,9 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 
 	copyHeaders(proxyReq.Header, r.Header)
 
-	resp, err := s.httpClient.Do(proxyReq) //nolint:gosec // trusted config
+	// Use the dedicated SSE HTTP client (Timeout=0) so long-lived streams
+	// are not killed by the normal request timeout.
+	resp, err := s.sseHTTPClient.Do(proxyReq) //nolint:gosec // trusted config
 	if err != nil {
 		s.logger.Error("SSE upstream request failed", "error", err)
 		http.Error(w, "upstream server unavailable", http.StatusBadGateway)

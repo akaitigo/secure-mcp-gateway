@@ -78,19 +78,23 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 			return
 		}
 
-		// Only audit POST requests (JSON-RPC method calls).
-		if r.Method != http.MethodPost {
-			next.ServeHTTP(w, r)
-			return
+		// For POST requests, extract tool name from JSON-RPC body.
+		// For non-POST requests (e.g., GET/SSE), log the request with
+		// the HTTP method + path as tool name.
+		var toolName string
+		if r.Method == http.MethodPost {
+			// Enforce body size limit before any io.ReadAll to prevent
+			// memory exhaustion. Without this, an attacker could send an
+			// arbitrarily large body that extractToolName would fully buffer.
+			r.Body = http.MaxBytesReader(w, r.Body, maxRequestSize)
+
+			// Read body to extract tool name, then restore it for downstream.
+			toolName = extractToolName(r)
+		} else {
+			// Non-POST requests (SSE connections, etc.) do not carry
+			// a JSON-RPC body, so use HTTP method + path for traceability.
+			toolName = r.Method + " " + r.URL.Path
 		}
-
-		// Enforce body size limit before any io.ReadAll to prevent
-		// memory exhaustion. Without this, an attacker could send an
-		// arbitrarily large body that extractToolName would fully buffer.
-		r.Body = http.MaxBytesReader(w, r.Body, maxRequestSize)
-
-		// Read body to extract tool name, then restore it for downstream.
-		toolName := extractToolName(r)
 
 		// Wrap response writer to capture status code.
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}

@@ -117,7 +117,7 @@ func TestAuditMiddleware_SkipHealthPath(t *testing.T) {
 	assert.Equal(t, 0, store.Count())
 }
 
-func TestAuditMiddleware_SkipGetRequests(t *testing.T) {
+func TestAuditMiddleware_LogsGetRequests(t *testing.T) {
 	t.Parallel()
 
 	mw, _, store := newTestMiddleware(t)
@@ -129,10 +129,16 @@ func TestAuditMiddleware_SkipGetRequests(t *testing.T) {
 	handler := mw.Handler(inner)
 
 	req := httptest.NewRequest(http.MethodGet, "/sse", nil)
+	ctx := WithRequestID(req.Context(), "sse-request-id")
+	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 
-	assert.Equal(t, 0, store.Count())
+	assert.Equal(t, 1, store.Count())
+	entries, _ := store.List(0, 1)
+	require.Len(t, entries, 1)
+	assert.Equal(t, "GET /sse", entries[0].ToolName)
+	assert.Equal(t, DecisionAllow, entries[0].Decision)
 }
 
 func TestAuditMiddleware_NonJSONContentType(t *testing.T) {
