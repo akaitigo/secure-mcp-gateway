@@ -152,12 +152,24 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
+// nonSSEWriteTimeout is the write deadline applied to non-SSE requests.
+// SSE (long-lived streaming) connections use no write timeout.
+const nonSSEWriteTimeout = 30 * time.Second
+
 // handleProxy routes MCP requests to the upstream server.
 func (s *Server) handleProxy(w http.ResponseWriter, r *http.Request) {
 	// Check if this is an SSE request.
 	if isSSERequest(r) {
 		s.handleSSE(w, r)
 		return
+	}
+
+	// Apply per-request write deadline for non-SSE requests.
+	// The server-level WriteTimeout is 0 to support SSE streaming,
+	// so we enforce timeouts on regular requests here.
+	rc := http.NewResponseController(w)
+	if err := rc.SetWriteDeadline(time.Now().Add(nonSSEWriteTimeout)); err != nil {
+		s.logger.Warn("failed to set write deadline", "error", err)
 	}
 
 	// Validate Content-Type for POST requests.

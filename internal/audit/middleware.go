@@ -54,14 +54,32 @@ func NewMiddleware(logger *Logger, opts ...MiddlewareOption) *Middleware {
 const AuditClientIDHeader = "X-Audit-Client-Id"
 
 // statusRecorder captures the HTTP status code written by downstream handlers.
+// It also implements http.Flusher to support SSE streaming through the
+// audit middleware without breaking the Flush interface.
 type statusRecorder struct {
 	http.ResponseWriter
-	status int
+	clientID string // captured from internal header before stripping
+	status   int
 }
 
 func (r *statusRecorder) WriteHeader(code int) {
 	r.status = code
+	// Capture and strip internal audit header before committing headers
+	// to the client. This ensures X-Audit-Client-Id is never exposed to
+	// external callers while preserving the value for audit logging.
+	if id := r.ResponseWriter.Header().Get(AuditClientIDHeader); id != "" {
+		r.clientID = id
+	}
+	r.ResponseWriter.Header().Del(AuditClientIDHeader)
 	r.ResponseWriter.WriteHeader(code)
+}
+
+// Flush delegates to the underlying ResponseWriter if it supports http.Flusher.
+// This is essential for SSE streaming which relies on flushing to push events.
+func (r *statusRecorder) Flush() {
+	if flusher, ok := r.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
 }
 
 // Handler wraps the given handler with audit logging.
@@ -93,28 +111,27 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 		} else {
 			// Non-POST requests (SSE connections, etc.) do not carry
 			// a JSON-RPC body, so use HTTP method + path for traceability.
-			toolName = r.Method + " " + r.URL.Path
+			toolName = truncate(r.Method+" "+r.URL.Path, maxHeaderValueLen)
 		}
 
-		// Wrap response writer to capture status code.
+		// Wrap response writer to capture status code and strip internal headers.
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rec, r)
+
+		// Determine client_id: prefer the value captured by statusRecorder
+		// from the internal header (set by auth middleware and stripped in
+		// WriteHeader), then fall back to request context.
+		clientID := unknownValue
+		if rec.clientID != "" {
+			clientID = rec.clientID
+		} else if info := auth.GetTokenInfo(r.Context()); info != nil {
+			clientID = info.ClientID
+		}
 
 		// Determine decision based on response status.
 		decision := DecisionAllow
 		if rec.status == http.StatusUnauthorized || rec.status == http.StatusForbidden {
 			decision = DecisionDeny
-		}
-
-		// Extract client_id: first try internal header (set by auth middleware),
-		// then fall back to request context.
-		clientID := unknownValue
-		if headerID := rec.Header().Get(AuditClientIDHeader); headerID != "" {
-			clientID = headerID
-			// Strip internal header so it is never sent to the client.
-			rec.Header().Del(AuditClientIDHeader)
-		} else if info := auth.GetTokenInfo(r.Context()); info != nil {
-			clientID = info.ClientID
 		}
 
 		// Get request ID from context (set by RequestIDMiddleware).
@@ -155,5 +172,13 @@ func extractToolName(r *http.Request) string {
 	if err != nil {
 		return unknownValue
 	}
-	return req.Method
+	return truncate(req.Method, maxHeaderValueLen)
+}
+
+// truncate returns s truncated to maxLen characters.
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen]
 }
