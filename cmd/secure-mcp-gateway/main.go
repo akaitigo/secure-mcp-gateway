@@ -84,18 +84,27 @@ func run() error {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
 
+	var startupErr error
 	select {
 	case sig := <-quit:
 		slog.Info("received shutdown signal", "signal", sig)
-	case err := <-errCh:
-		return err
+	case startupErr = <-errCh:
+		slog.Error("server error, initiating shutdown", "error", startupErr)
 	}
 
 	// Give in-flight requests up to 30 seconds to complete.
+	// GracefulStop is always called regardless of how shutdown was triggered.
 	const shutdownTimeout = 30 * time.Second
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 
 	grpcSrv.GracefulStop()
-	return srv.Shutdown(ctx)
+	if err := srv.Shutdown(ctx); err != nil {
+		return err
+	}
+	// Close audit log file if it was opened (no-op for stdout).
+	if err := auditLogger.Close(); err != nil {
+		slog.Error("failed to close audit log", "error", err)
+	}
+	return startupErr
 }

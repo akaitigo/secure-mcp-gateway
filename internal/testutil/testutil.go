@@ -14,7 +14,7 @@ import (
 
 // JSONRPCRequest represents a JSON-RPC 2.0 request for testing.
 type JSONRPCRequest struct {
-	Params  interface{} `json:"params,omitempty"`
+	Params  any `json:"params,omitempty"`
 	JSONRPC string      `json:"jsonrpc"`
 	Method  string      `json:"method"`
 	ID      int         `json:"id"`
@@ -35,7 +35,7 @@ type JSONRPCError struct {
 }
 
 // NewJSONRPCRequest creates a new JSON-RPC 2.0 request body as an io.Reader.
-func NewJSONRPCRequest(t *testing.T, method string, params interface{}) io.Reader {
+func NewJSONRPCRequest(t *testing.T, method string, params any) io.Reader {
 	t.Helper()
 
 	req := JSONRPCRequest{
@@ -85,7 +85,7 @@ func NewMockHydraServer(active bool, clientID string) *httptest.Server {
 
 		w.Header().Set("Content-Type", "application/json")
 
-		resp := map[string]interface{}{
+		resp := map[string]any{
 			"active": active,
 		}
 		if active {
@@ -121,7 +121,7 @@ func NewMockHydraServerWithTokenValidation(expectedToken, clientID string) *http
 		token := r.FormValue("token") //nolint:gosec // test mock
 		w.Header().Set("Content-Type", "application/json")
 
-		resp := map[string]interface{}{
+		resp := map[string]any{
 			"active": token == expectedToken,
 		}
 		if token == expectedToken {

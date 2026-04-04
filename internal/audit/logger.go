@@ -12,6 +12,7 @@ import (
 type Logger struct {
 	slogger *slog.Logger
 	store   *Store
+	closer  io.Closer // non-nil when the logger owns the underlying file
 }
 
 // NewLogger creates a new audit logger.
@@ -29,6 +30,12 @@ func NewLogger(logPath string, store *Store) (*Logger, error) {
 			return nil, err
 		}
 		w = f
+		l := &Logger{
+			slogger: slog.New(slog.NewJSONHandler(w, &slog.HandlerOptions{Level: slog.LevelInfo})),
+			store:   store,
+			closer:  f,
+		}
+		return l, nil
 	}
 
 	handler := slog.NewJSONHandler(w, &slog.HandlerOptions{
@@ -39,6 +46,16 @@ func NewLogger(logPath string, store *Store) (*Logger, error) {
 		slogger: slog.New(handler),
 		store:   store,
 	}, nil
+}
+
+// Close releases resources held by the logger.
+// When the logger writes to a file (not stdout), Close closes the file.
+// It is safe to call Close multiple times.
+func (l *Logger) Close() error {
+	if l.closer != nil {
+		return l.closer.Close()
+	}
+	return nil
 }
 
 // NewLoggerWithWriter creates an audit logger that writes to the given writer.

@@ -23,7 +23,7 @@ func TestLogger_Log(t *testing.T) {
 	logger.Log(entry)
 
 	// Verify structured log output.
-	var logOutput map[string]interface{}
+	var logOutput map[string]any
 	err := json.Unmarshal(buf.Bytes(), &logOutput)
 	require.NoError(t, err)
 
@@ -51,7 +51,7 @@ func TestLogger_LogDeny(t *testing.T) {
 	entry := NewEntry("unknown", "tools/call", DecisionDeny, "req-000", nil)
 	logger.Log(entry)
 
-	var logOutput map[string]interface{}
+	var logOutput map[string]any
 	err := json.Unmarshal(buf.Bytes(), &logOutput)
 	require.NoError(t, err)
 
@@ -130,4 +130,28 @@ func TestNewLogger_InvalidPath(t *testing.T) {
 	store := NewStore()
 	_, err := NewLogger("/nonexistent/dir/audit.log", store)
 	require.Error(t, err)
+}
+
+func TestNewLogger_FileClose(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	path := dir + "/audit_test.log"
+	store := NewStore()
+	logger, err := NewLogger(path, store)
+	require.NoError(t, err)
+
+	logger.Log(NewEntry("c", "tools/call", DecisionAllow, "r", nil))
+
+	require.NoError(t, logger.Close())
+}
+
+func TestNewLogger_StdoutClose(t *testing.T) {
+	t.Parallel()
+
+	store := NewStore()
+	logger, err := NewLogger("stdout", store)
+	require.NoError(t, err)
+
+	require.NoError(t, logger.Close())
 }
