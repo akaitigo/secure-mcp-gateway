@@ -343,7 +343,8 @@ func isMaxBytesError(err error) bool {
 }
 
 // copyHeaders copies HTTP headers, excluding hop-by-hop and
-// security-sensitive headers that must not be forwarded to upstream.
+// security-sensitive headers that must not be forwarded.
+// Used for both request headers (to upstream) and response headers (to client).
 func copyHeaders(dst, src http.Header) {
 	excluded := map[string]bool{
 		// Hop-by-hop headers (RFC 2616 §13.5.1).
@@ -359,6 +360,9 @@ func copyHeaders(dst, src http.Header) {
 		// token for gateway authentication. Forwarding it to upstream
 		// would leak credentials to an external service.
 		"Authorization": true,
+		// Internal audit header: strip from both directions to prevent
+		// leaking internal infrastructure details to clients or upstream.
+		"X-Audit-Client-Id": true,
 	}
 
 	for key, values := range src {
