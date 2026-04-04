@@ -3,6 +3,7 @@
 package proxy
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -221,7 +222,7 @@ func (s *Server) forwardRequest(w http.ResponseWriter, r *http.Request, body []b
 
 	var bodyReader io.Reader
 	if len(body) > 0 {
-		bodyReader = strings.NewReader(string(body))
+		bodyReader = bytes.NewReader(body)
 	}
 
 	// upstream URL is derived from a trusted server-side configuration value (UPSTREAM_MCP_URL),
