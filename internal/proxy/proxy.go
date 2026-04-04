@@ -286,7 +286,12 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 
 	s.logger.Info("SSE connection established", "remote_addr", r.RemoteAddr)
 
-	// Set SSE headers.
+	// Copy upstream response headers before setting SSE-specific overrides.
+	// This forwards any custom headers from the upstream SSE server (e.g., session IDs)
+	// while ensuring SSE protocol headers have the correct values.
+	copyHeaders(w.Header(), resp.Header)
+
+	// Override/set required SSE headers.
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
