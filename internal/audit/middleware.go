@@ -74,6 +74,18 @@ func (r *statusRecorder) WriteHeader(code int) {
 	r.ResponseWriter.WriteHeader(code)
 }
 
+// Write delegates to the underlying ResponseWriter and ensures that implicit
+// WriteHeader(200) calls also capture the audit client ID header.
+// Without this override, calling Write() directly would trigger the embedded
+// ResponseWriter.WriteHeader, bypassing our custom capture logic.
+func (r *statusRecorder) Write(b []byte) (int, error) {
+	if r.status == 0 {
+		// Implicit 200 OK: capture headers before the embedded Write triggers WriteHeader.
+		r.WriteHeader(http.StatusOK)
+	}
+	return r.ResponseWriter.Write(b)
+}
+
 // Flush delegates to the underlying ResponseWriter if it supports http.Flusher.
 // This is essential for SSE streaming which relies on flushing to push events.
 func (r *statusRecorder) Flush() {
@@ -115,7 +127,8 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 		}
 
 		// Wrap response writer to capture status code and strip internal headers.
-		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		// status is 0 until WriteHeader is explicitly called or Write triggers implicit 200.
+		rec := &statusRecorder{ResponseWriter: w}
 		next.ServeHTTP(rec, r)
 
 		// Determine client_id: prefer the value captured by statusRecorder
@@ -129,8 +142,13 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 		}
 
 		// Determine decision based on response status.
+		// A zero status means no explicit WriteHeader or Write was called; treat as 200 OK.
 		decision := DecisionAllow
-		if rec.status == http.StatusUnauthorized || rec.status == http.StatusForbidden {
+		effectiveStatus := rec.status
+		if effectiveStatus == 0 {
+			effectiveStatus = http.StatusOK
+		}
+		if effectiveStatus == http.StatusUnauthorized || effectiveStatus == http.StatusForbidden {
 			decision = DecisionDeny
 		}
 
@@ -141,7 +159,7 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 			"http_method": r.Method,
 			"path":        r.URL.Path,
 			"remote_addr": r.RemoteAddr,
-			"status_code": http.StatusText(rec.status),
+			"status_code": http.StatusText(effectiveStatus),
 		}
 
 		entry := NewEntry(clientID, toolName, decision, requestID, metadata)
