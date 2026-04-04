@@ -14,10 +14,10 @@ import (
 
 // JSONRPCRequest represents a JSON-RPC 2.0 request for testing.
 type JSONRPCRequest struct {
-	Params  any `json:"params,omitempty"`
-	JSONRPC string      `json:"jsonrpc"`
-	Method  string      `json:"method"`
-	ID      int         `json:"id"`
+	Params  any    `json:"params,omitempty"`
+	JSONRPC string `json:"jsonrpc"`
+	Method  string `json:"method"`
+	ID      int    `json:"id"`
 }
 
 // JSONRPCResponse represents a JSON-RPC 2.0 response for testing.
