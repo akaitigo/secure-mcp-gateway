@@ -179,12 +179,16 @@ func extractToolName(r *http.Request) string {
 		return unknownValue
 	}
 
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
+	body, readErr := io.ReadAll(r.Body)
+	// Always restore whatever was read so downstream handlers can still process or
+	// correctly reject the request. When readErr != nil (e.g., MaxBytesError from
+	// an oversized body), body contains partial data; restoring it ensures the proxy
+	// MaxBytesReader can return the appropriate error response instead of treating
+	// the body as empty.
+	r.Body = io.NopCloser(bytes.NewReader(body))
+	if readErr != nil {
 		return unknownValue
 	}
-	// Restore body for downstream handlers.
-	r.Body = io.NopCloser(bytes.NewReader(body))
 
 	req, err := jsonrpc.Parse(body)
 	if err != nil {

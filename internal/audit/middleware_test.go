@@ -269,3 +269,31 @@ func TestAuditMiddleware_OversizedBodyRejected(t *testing.T) {
 	require.Len(t, entries, 1)
 	assert.Equal(t, unknownValue, entries[0].ToolName)
 }
+
+func TestAuditMiddleware_OversizedBodyRestoredForDownstream(t *testing.T) {
+	t.Parallel()
+
+	mw, _, _ := newTestMiddleware(t)
+
+	var downstreamBodySize int
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		downstreamBodySize = len(body)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	handler := mw.Handler(inner)
+
+	// 1MB + 1 byte: audit middleware reads up to 1MB then fails.
+	// The partial 1MB body must be restored for downstream to read.
+	oversizedBody := strings.Repeat("x", 1<<20+1)
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(oversizedBody))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	// Downstream should receive the partial body (up to 1MB), not an empty body.
+	// This ensures downstream can generate the correct error response.
+	assert.Equal(t, 1<<20, downstreamBodySize,
+		"partial body must be restored for downstream processing")
+}
