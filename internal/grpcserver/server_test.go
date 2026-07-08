@@ -31,7 +31,8 @@ func newTestServer(t *testing.T, store *audit.Store) (gatewayv1.GatewayServiceCl
 		_ = srv.Serve(ln)
 	}()
 
-	conn, err := grpc.NewClient(ln.Addr().String(),
+	conn, err := grpc.NewClient(
+		ln.Addr().String(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	require.NoError(t, err)

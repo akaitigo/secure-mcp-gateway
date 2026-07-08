@@ -74,7 +74,8 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 		// Extract Bearer token from Authorization header.
 		token, err := extractBearerToken(r)
 		if err != nil {
-			m.logger.Warn("token extraction failed",
+			m.logger.Warn(
+				"token extraction failed",
 				"error", err.Error(),
 				"remote_addr", r.RemoteAddr,
 			)
@@ -90,7 +91,8 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 					Scopes:   parseScopes(result.Scope),
 				}
 				ctx := WithTokenInfo(r.Context(), info)
-				m.logger.Debug("token validated from cache",
+				m.logger.Debug(
+					"token validated from cache",
 					"client_id", result.ClientID,
 				)
 				w.Header().Set(auditClientIDHeader, result.ClientID)
@@ -98,7 +100,8 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 				return
 			}
 			// Cached as inactive.
-			m.logger.Warn("token is inactive (cached)",
+			m.logger.Warn(
+				"token is inactive (cached)",
 				"remote_addr", r.RemoteAddr,
 			)
 			writeUnauthorized(w, "token is not active")
@@ -108,7 +111,8 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 		// Introspect the token with Hydra.
 		result, err := m.introspector.Introspect(r.Context(), token)
 		if err != nil {
-			m.logger.Error("token introspection failed",
+			m.logger.Error(
+				"token introspection failed",
 				"error", err.Error(),
 				"remote_addr", r.RemoteAddr,
 			)
@@ -120,7 +124,8 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 		m.cache.Set(token, result)
 
 		if !result.Active {
-			m.logger.Warn("token is not active",
+			m.logger.Warn(
+				"token is not active",
 				"remote_addr", r.RemoteAddr,
 			)
 			writeUnauthorized(w, "token is not active")
@@ -133,7 +138,8 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 			Scopes:   parseScopes(result.Scope),
 		}
 		ctx := WithTokenInfo(r.Context(), info)
-		m.logger.Info("request authenticated",
+		m.logger.Info(
+			"request authenticated",
 			"client_id", result.ClientID,
 			"remote_addr", r.RemoteAddr,
 		)

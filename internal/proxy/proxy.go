@@ -111,7 +111,8 @@ func New(listenAddr, upstreamMCPURL string, opts ...Option) (*Server, error) {
 
 // ListenAndServe starts the proxy server. It blocks until the server stops.
 func (s *Server) ListenAndServe() error {
-	s.logger.Info("proxy server starting",
+	s.logger.Info(
+		"proxy server starting",
 		"addr", s.httpServer.Addr,
 		"upstream", s.upstreamURL.String(),
 	)
@@ -123,7 +124,8 @@ func (s *Server) ListenAndServe() error {
 
 // Serve starts the proxy server on the given listener. Useful for testing.
 func (s *Server) Serve(ln net.Listener) error {
-	s.logger.Info("proxy server starting",
+	s.logger.Info(
+		"proxy server starting",
 		"addr", ln.Addr().String(),
 		"upstream", s.upstreamURL.String(),
 	)
@@ -206,7 +208,8 @@ func (s *Server) handleProxy(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		s.logger.Info("proxying MCP request",
+		s.logger.Info(
+			"proxying MCP request",
 			"method", req.Method,
 			"remote_addr", r.RemoteAddr,
 		)
