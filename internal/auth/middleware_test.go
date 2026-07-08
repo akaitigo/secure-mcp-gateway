@@ -52,7 +52,8 @@ func TestMiddleware_ValidToken(t *testing.T) {
 		},
 	}
 
-	mw := NewMiddleware(mock,
+	mw := NewMiddleware(
+		mock,
 		WithMiddlewareLogger(newTestLogger()),
 	)
 
@@ -77,7 +78,8 @@ func TestMiddleware_InvalidToken(t *testing.T) {
 		},
 	}
 
-	mw := NewMiddleware(mock,
+	mw := NewMiddleware(
+		mock,
 		WithMiddlewareLogger(newTestLogger()),
 	)
 
@@ -98,7 +100,8 @@ func TestMiddleware_MissingToken(t *testing.T) {
 
 	mock := &mockIntrospector{}
 
-	mw := NewMiddleware(mock,
+	mw := NewMiddleware(
+		mock,
 		WithMiddlewareLogger(newTestLogger()),
 	)
 
@@ -120,7 +123,8 @@ func TestMiddleware_IntrospectionError(t *testing.T) {
 		err: errors.New("hydra is down"),
 	}
 
-	mw := NewMiddleware(mock,
+	mw := NewMiddleware(
+		mock,
 		WithMiddlewareLogger(newTestLogger()),
 	)
 
@@ -140,7 +144,8 @@ func TestMiddleware_SkipPath(t *testing.T) {
 
 	mock := &mockIntrospector{}
 
-	mw := NewMiddleware(mock,
+	mw := NewMiddleware(
+		mock,
 		WithMiddlewareLogger(newTestLogger()),
 		WithSkipPaths("/health"),
 	)
@@ -168,7 +173,8 @@ func TestMiddleware_CacheHit(t *testing.T) {
 		},
 	}
 
-	mw := NewMiddleware(mock,
+	mw := NewMiddleware(
+		mock,
 		WithMiddlewareLogger(newTestLogger()),
 	)
 
@@ -203,7 +209,8 @@ func TestMiddleware_CachedInactiveToken(t *testing.T) {
 		},
 	}
 
-	mw := NewMiddleware(mock,
+	mw := NewMiddleware(
+		mock,
 		WithMiddlewareLogger(newTestLogger()),
 	)
 
@@ -233,7 +240,8 @@ func TestMiddleware_MultipleSkipPaths(t *testing.T) {
 
 	mock := &mockIntrospector{}
 
-	mw := NewMiddleware(mock,
+	mw := NewMiddleware(
+		mock,
 		WithMiddlewareLogger(newTestLogger()),
 		WithSkipPaths("/health", "/ready", "/metrics"),
 	)
@@ -256,7 +264,8 @@ func TestMiddleware_NonBearerScheme(t *testing.T) {
 
 	mock := &mockIntrospector{}
 
-	mw := NewMiddleware(mock,
+	mw := NewMiddleware(
+		mock,
 		WithMiddlewareLogger(newTestLogger()),
 	)
 
@@ -282,7 +291,8 @@ func TestMiddleware_TokenInfoPropagated(t *testing.T) {
 		},
 	}
 
-	mw := NewMiddleware(mock,
+	mw := NewMiddleware(
+		mock,
 		WithMiddlewareLogger(newTestLogger()),
 	)
 
@@ -315,7 +325,8 @@ func TestMiddleware_WithCustomCache(t *testing.T) {
 
 	mock := &mockIntrospector{}
 
-	mw := NewMiddleware(mock,
+	mw := NewMiddleware(
+		mock,
 		WithMiddlewareLogger(newTestLogger()),
 		WithCache(cache),
 	)

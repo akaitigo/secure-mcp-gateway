@@ -74,7 +74,8 @@ func NewLoggerWithWriter(w io.Writer, store *Store) *Logger {
 // Sensitive information (tokens, request bodies) is never included.
 func (l *Logger) Log(entry *Entry) {
 	attrs := make([]slog.Attr, 0, 6+len(entry.Metadata))
-	attrs = append(attrs,
+	attrs = append(
+		attrs,
 		slog.String("audit_id", entry.ID),
 		slog.String("client_id", entry.ClientID),
 		slog.String("tool_name", entry.ToolName),

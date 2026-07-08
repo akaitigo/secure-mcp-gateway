@@ -45,14 +45,16 @@ func newTestGateway(
 	auditStore := audit.NewStore()
 	var auditBuf bytes.Buffer
 	auditLogger := audit.NewLoggerWithWriter(&auditBuf, auditStore)
-	auditMiddleware := audit.NewMiddleware(auditLogger,
+	auditMiddleware := audit.NewMiddleware(
+		auditLogger,
 		audit.WithSkipPaths("/health"),
 	)
 
 	// Set up auth middleware using mock Hydra.
 	introspector, err := auth.NewHydraIntrospector(hydraServer.URL, nil)
 	require.NoError(t, err)
-	authMiddleware := auth.NewMiddleware(introspector,
+	authMiddleware := auth.NewMiddleware(
+		introspector,
 		auth.WithSkipPaths("/health"),
 		auth.WithMiddlewareLogger(slog.New(slog.NewJSONHandler(io.Discard, nil))),
 	)
@@ -62,7 +64,8 @@ func newTestGateway(
 	//   RequestID -> Audit -> Auth -> Proxy handler
 	// Audit wraps Auth so that both ALLOW and DENY decisions are logged.
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	srv, err := proxy.New(":0", upstreamServer.URL,
+	srv, err := proxy.New(
+		":0", upstreamServer.URL,
 		proxy.WithLogger(logger),
 		proxy.WithMiddleware(audit.RequestIDMiddleware),
 		proxy.WithMiddleware(auditMiddleware.Handler),

@@ -36,7 +36,8 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	auditMiddleware := audit.NewMiddleware(auditLogger,
+	auditMiddleware := audit.NewMiddleware(
+		auditLogger,
 		audit.WithSkipPaths("/health"),
 	)
 
@@ -45,7 +46,8 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	authMiddleware := auth.NewMiddleware(introspector,
+	authMiddleware := auth.NewMiddleware(
+		introspector,
 		auth.WithSkipPaths("/health"),
 	)
 
@@ -53,7 +55,8 @@ func run() error {
 	// RequestID -> Audit -> Auth -> Proxy handler
 	// Audit wraps Auth so that both ALLOW and DENY decisions are logged,
 	// ensuring 100% audit log coverage per PRD requirements.
-	srv, err := proxy.New(cfg.ProxyListenAddr, cfg.UpstreamMCPURL,
+	srv, err := proxy.New(
+		cfg.ProxyListenAddr, cfg.UpstreamMCPURL,
 		proxy.WithMiddleware(audit.RequestIDMiddleware),
 		proxy.WithMiddleware(auditMiddleware.Handler),
 		proxy.WithMiddleware(authMiddleware.Handler),
