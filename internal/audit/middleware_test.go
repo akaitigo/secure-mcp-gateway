@@ -63,7 +63,7 @@ func TestAuditMiddleware_LogsToolCall(t *testing.T) {
 	assert.Equal(t, "tools/call", entry.ToolName)
 	assert.Equal(t, DecisionAllow, entry.Decision)
 	assert.Equal(t, "test-request-id", entry.RequestID)
-	assert.Equal(t, "POST", entry.Metadata["http_method"])
+	assert.Equal(t, "POST", entry.Metadata[metadataKeyHTTPMethod])
 
 	// Verify structured log output.
 	var logOutput map[string]interface{}

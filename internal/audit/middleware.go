@@ -13,6 +13,9 @@ import (
 // unknownValue is the fallback used when client ID or tool name cannot be determined.
 const unknownValue = "unknown"
 
+// metadataKeyHTTPMethod is the audit entry metadata key for the HTTP method.
+const metadataKeyHTTPMethod = "http_method"
+
 // maxRequestSize is the maximum allowed request body size (1MB).
 // This must be enforced before any io.ReadAll to prevent memory
 // exhaustion from oversized payloads.
@@ -156,10 +159,10 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 		requestID := GetRequestID(r.Context())
 
 		metadata := map[string]string{
-			"http_method": r.Method,
-			"path":        r.URL.Path,
-			"remote_addr": r.RemoteAddr,
-			"status_code": http.StatusText(effectiveStatus),
+			metadataKeyHTTPMethod: r.Method,
+			"path":                r.URL.Path,
+			"remote_addr":         r.RemoteAddr,
+			"status_code":         http.StatusText(effectiveStatus),
 		}
 
 		entry := NewEntry(clientID, toolName, decision, requestID, metadata)
