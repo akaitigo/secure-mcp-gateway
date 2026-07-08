@@ -11,7 +11,7 @@ import (
 func TestNewEntry(t *testing.T) {
 	t.Parallel()
 
-	metadata := map[string]string{"http_method": "POST"}
+	metadata := map[string]string{metadataKeyHTTPMethod: "POST"}
 	entry := NewEntry("client-123", "tools/call", DecisionAllow, "req-456", metadata)
 
 	assert.NotEmpty(t, entry.ID)
@@ -19,7 +19,7 @@ func TestNewEntry(t *testing.T) {
 	assert.Equal(t, "tools/call", entry.ToolName)
 	assert.Equal(t, DecisionAllow, entry.Decision)
 	assert.Equal(t, "req-456", entry.RequestID)
-	assert.Equal(t, "POST", entry.Metadata["http_method"])
+	assert.Equal(t, "POST", entry.Metadata[metadataKeyHTTPMethod])
 
 	// Verify timestamp is valid RFC 3339.
 	_, err := time.Parse(time.RFC3339, entry.Timestamp)

@@ -17,8 +17,8 @@ func TestLogger_Log(t *testing.T) {
 	logger := NewLoggerWithWriter(&buf, store)
 
 	entry := NewEntry("client-123", "tools/call", DecisionAllow, "req-456", map[string]string{
-		"http_method": "POST",
-		"path":        "/",
+		metadataKeyHTTPMethod: "POST",
+		"path":                "/",
 	})
 	logger.Log(entry)
 
@@ -95,7 +95,7 @@ func TestLogger_NoSensitiveData(t *testing.T) {
 	logger := NewLoggerWithWriter(&buf, store)
 
 	entry := NewEntry("client-123", "tools/call", DecisionAllow, "req-456", map[string]string{
-		"http_method": "POST",
+		metadataKeyHTTPMethod: "POST",
 	})
 	logger.Log(entry)
 
