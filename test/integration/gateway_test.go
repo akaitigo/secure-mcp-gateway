@@ -1,5 +1,6 @@
 // Package integration provides end-to-end tests for the secure-mcp-gateway.
-// These tests verify the full request flow: Proxy -> Token Verification -> Audit Logging.
+// These tests verify the full request flow:
+// Proxy -> Token Verification -> Policy Evaluation -> Audit Logging.
 package integration
 
 import (
@@ -21,11 +22,13 @@ import (
 
 	"github.com/akaitigo/secure-mcp-gateway/internal/audit"
 	"github.com/akaitigo/secure-mcp-gateway/internal/auth"
+	"github.com/akaitigo/secure-mcp-gateway/internal/policy"
 	"github.com/akaitigo/secure-mcp-gateway/internal/proxy"
 	"github.com/akaitigo/secure-mcp-gateway/internal/testutil"
 )
 
-// testGateway encapsulates a fully wired gateway (proxy + auth + audit) for integration tests.
+// testGateway encapsulates a fully wired gateway (proxy + auth + policy + audit)
+// for integration tests.
 type testGateway struct {
 	cleanup    func()
 	auditStore *audit.Store
@@ -33,11 +36,12 @@ type testGateway struct {
 }
 
 // newTestGateway creates a gateway with the full middleware chain:
-// RequestID -> Audit -> Auth -> Proxy -> Upstream MCP mock.
+// RequestID -> Audit -> Auth -> Policy -> Proxy -> Upstream MCP mock.
 func newTestGateway(
 	t *testing.T,
 	hydraServer *httptest.Server,
 	upstreamServer *httptest.Server,
+	opaServer *httptest.Server,
 ) *testGateway {
 	t.Helper()
 
@@ -59,10 +63,19 @@ func newTestGateway(
 		auth.WithMiddlewareLogger(slog.New(slog.NewJSONHandler(io.Discard, nil))),
 	)
 
+	// Set up policy middleware using mock OPA.
+	policyClient, err := policy.NewClient(opaServer.URL, nil)
+	require.NoError(t, err)
+	policyMiddleware := policy.NewMiddleware(
+		policyClient,
+		policy.WithSkipPaths("/health"),
+		policy.WithMiddlewareLogger(slog.New(slog.NewJSONHandler(io.Discard, nil))),
+	)
+
 	// Build proxy with full middleware chain.
 	// Middleware order (outermost to innermost):
-	//   RequestID -> Audit -> Auth -> Proxy handler
-	// Audit wraps Auth so that both ALLOW and DENY decisions are logged.
+	//   RequestID -> Audit -> Auth -> Policy -> Proxy handler
+	// Audit wraps Auth and Policy so that both ALLOW and DENY decisions are logged.
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	srv, err := proxy.New(
 		":0", upstreamServer.URL,
@@ -70,6 +83,7 @@ func newTestGateway(
 		proxy.WithMiddleware(audit.RequestIDMiddleware),
 		proxy.WithMiddleware(auditMiddleware.Handler),
 		proxy.WithMiddleware(authMiddleware.Handler),
+		proxy.WithMiddleware(policyMiddleware.Handler),
 	)
 	require.NoError(t, err)
 
@@ -88,6 +102,7 @@ func newTestGateway(
 		_ = srv.Shutdown(ctx)
 		hydraServer.Close()
 		upstreamServer.Close()
+		opaServer.Close()
 	}
 
 	return &testGateway{
@@ -129,7 +144,7 @@ func TestIntegration_ValidToken_AllowAndAuditLog(t *testing.T) {
 
 	hydra := testutil.NewMockHydraServerWithTokenValidation(validToken, clientID)
 	upstream := newMockUpstream()
-	gw := newTestGateway(t, hydra, upstream)
+	gw := newTestGateway(t, hydra, upstream, testutil.NewAllowAllOPAServer())
 	defer gw.cleanup()
 
 	// Send a valid tools/call request with a valid Bearer token.
@@ -187,7 +202,7 @@ func TestIntegration_InvalidToken_DenyAndAuditLog(t *testing.T) {
 
 	hydra := testutil.NewMockHydraServerWithTokenValidation(validToken, clientID)
 	upstream := newMockUpstream()
-	gw := newTestGateway(t, hydra, upstream)
+	gw := newTestGateway(t, hydra, upstream, testutil.NewAllowAllOPAServer())
 	defer gw.cleanup()
 
 	// Send a tools/call request with an INVALID Bearer token.
@@ -229,7 +244,7 @@ func TestIntegration_MissingToken_DenyAndAuditLog(t *testing.T) {
 
 	hydra := testutil.NewMockHydraServer(true, "any-client")
 	upstream := newMockUpstream()
-	gw := newTestGateway(t, hydra, upstream)
+	gw := newTestGateway(t, hydra, upstream, testutil.NewAllowAllOPAServer())
 	defer gw.cleanup()
 
 	// Send a request without any Authorization header.
@@ -262,7 +277,7 @@ func TestIntegration_HealthEndpoint_BypassesAuthAndAudit(t *testing.T) {
 
 	hydra := testutil.NewMockHydraServer(false, "")
 	upstream := newMockUpstream()
-	gw := newTestGateway(t, hydra, upstream)
+	gw := newTestGateway(t, hydra, upstream, testutil.NewAllowAllOPAServer())
 	defer gw.cleanup()
 
 	// Hit /health without any auth token.
@@ -297,7 +312,7 @@ func TestIntegration_MultipleRequests_AuditLogOrder(t *testing.T) {
 
 	hydra := testutil.NewMockHydraServerWithTokenValidation(validToken, clientID)
 	upstream := newMockUpstream()
-	gw := newTestGateway(t, hydra, upstream)
+	gw := newTestGateway(t, hydra, upstream, testutil.NewAllowAllOPAServer())
 	defer gw.cleanup()
 
 	methods := []string{"tools/list", "tools/call", "resources/read"}
@@ -348,7 +363,7 @@ func TestIntegration_RequestID_Propagation(t *testing.T) {
 
 	hydra := testutil.NewMockHydraServerWithTokenValidation(validToken, clientID)
 	upstream := newMockUpstream()
-	gw := newTestGateway(t, hydra, upstream)
+	gw := newTestGateway(t, hydra, upstream, testutil.NewAllowAllOPAServer())
 	defer gw.cleanup()
 
 	// Test 1: Auto-generated request ID.
@@ -389,4 +404,206 @@ func TestIntegration_RequestID_Propagation(t *testing.T) {
 	// Newest first: custom ID entry is entries[0].
 	assert.Equal(t, customID, entries[0].RequestID)
 	assert.NotEmpty(t, entries[1].RequestID)
+}
+
+// newToolPolicyOPA creates a mock OPA server that mirrors the default Rego
+// policy semantics: tools/list is always allowed, and tools/call is allowed
+// only for the given client_id and tool names.
+func newToolPolicyOPA(clientID string, allowedTools ...string) *httptest.Server {
+	allowed := make(map[string]bool, len(allowedTools))
+	for _, tool := range allowedTools {
+		allowed[tool] = true
+	}
+
+	return testutil.NewMockOPAServer(func(input map[string]any) bool {
+		method, _ := input["method"].(string)
+		if method == "tools/list" {
+			return true
+		}
+		if method != "tools/call" {
+			return false
+		}
+		client, _ := input["client_id"].(string)
+		tool, _ := input["tool_name"].(string)
+		return client == clientID && allowed[tool]
+	})
+}
+
+// TestIntegration_PolicyAllowedTool_ForwardedAndAuditAllow verifies that a
+// tool call permitted by policy is forwarded upstream and logged as ALLOW.
+func TestIntegration_PolicyAllowedTool_ForwardedAndAuditAllow(t *testing.T) {
+	t.Parallel()
+
+	const (
+		validToken = "pol-ok1"
+		clientID   = "policy-agent"
+	)
+
+	hydra := testutil.NewMockHydraServerWithTokenValidation(validToken, clientID)
+	upstream := newMockUpstream()
+	opa := newToolPolicyOPA(clientID, "db-query")
+	gw := newTestGateway(t, hydra, upstream, opa)
+	defer gw.cleanup()
+
+	body := `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"db-query"}}`
+	ctx := t.Context()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, gw.proxyURL+"/",
+		strings.NewReader(body))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+validToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var rpcResp map[string]interface{}
+	err = json.NewDecoder(resp.Body).Decode(&rpcResp)
+	require.NoError(t, err)
+	result, ok := rpcResp["result"].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "success", result["output"])
+
+	// Verify audit log recorded ALLOW.
+	entries, total := gw.auditStore.List(0, 10)
+	require.Equal(t, 1, total)
+	assert.Equal(t, audit.DecisionAllow, entries[0].Decision)
+	assert.Equal(t, clientID, entries[0].ClientID)
+}
+
+// TestIntegration_PolicyDeniedTool_403AndAuditDeny verifies that a tool call
+// rejected by policy returns 403, is never forwarded upstream, and is logged
+// as DENY with the authenticated client_id.
+func TestIntegration_PolicyDeniedTool_403AndAuditDeny(t *testing.T) {
+	t.Parallel()
+
+	const (
+		validToken = "pol-ng1"
+		clientID   = "policy-agent"
+	)
+
+	hydra := testutil.NewMockHydraServerWithTokenValidation(validToken, clientID)
+
+	// Upstream must never be reached for denied calls.
+	var upstreamCalled bool
+	upstream := testutil.NewMockMCPServer(func(w http.ResponseWriter, _ *http.Request) {
+		upstreamCalled = true
+		w.WriteHeader(http.StatusOK)
+	})
+
+	opa := newToolPolicyOPA(clientID, "db-query")
+	gw := newTestGateway(t, hydra, upstream, opa)
+	defer gw.cleanup()
+
+	body := `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"secret-tool"}}`
+	ctx := t.Context()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, gw.proxyURL+"/",
+		strings.NewReader(body))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+validToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+
+	respBody, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Contains(t, string(respBody), "denied by policy")
+
+	assert.False(t, upstreamCalled, "denied requests must not reach upstream")
+
+	// Verify audit log recorded DENY with the authenticated client_id.
+	entries, total := gw.auditStore.List(0, 10)
+	require.Equal(t, 1, total)
+	assert.Equal(t, audit.DecisionDeny, entries[0].Decision)
+	assert.Equal(t, clientID, entries[0].ClientID)
+	assert.Equal(t, "tools/call", entries[0].ToolName)
+}
+
+// TestIntegration_OPAUnavailable_FailClose verifies that requests are denied
+// with 403 when the policy engine is unreachable (fail-close).
+func TestIntegration_OPAUnavailable_FailClose(t *testing.T) {
+	t.Parallel()
+
+	const (
+		validToken = "fc-tok1"
+		clientID   = "fail-close-agent"
+	)
+
+	hydra := testutil.NewMockHydraServerWithTokenValidation(validToken, clientID)
+
+	var upstreamCalled bool
+	upstream := testutil.NewMockMCPServer(func(w http.ResponseWriter, _ *http.Request) {
+		upstreamCalled = true
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// Close the OPA server immediately to simulate an outage. The URL stays
+	// valid but nothing is listening.
+	opa := testutil.NewAllowAllOPAServer()
+	opa.Close()
+	gw := newTestGateway(t, hydra, upstream, opa)
+	defer gw.cleanup()
+
+	body := `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"db-query"}}`
+	ctx := t.Context()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, gw.proxyURL+"/",
+		strings.NewReader(body))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+validToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+
+	respBody, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Contains(t, string(respBody), "policy evaluation unavailable")
+
+	assert.False(t, upstreamCalled, "requests must not reach upstream when OPA is down")
+
+	// Verify audit log recorded DENY.
+	entries, total := gw.auditStore.List(0, 10)
+	require.Equal(t, 1, total)
+	assert.Equal(t, audit.DecisionDeny, entries[0].Decision)
+}
+
+// TestIntegration_PolicyDiscoveryMethodAllowed verifies that discovery
+// methods (tools/list) pass policy without a tool grant.
+func TestIntegration_PolicyDiscoveryMethodAllowed(t *testing.T) {
+	t.Parallel()
+
+	const (
+		validToken = "disc-01"
+		clientID   = "discovery-agent"
+	)
+
+	hydra := testutil.NewMockHydraServerWithTokenValidation(validToken, clientID)
+	upstream := newMockUpstream()
+	// No tool grants at all: only discovery methods are allowed.
+	opa := newToolPolicyOPA(clientID)
+	gw := newTestGateway(t, hydra, upstream, opa)
+	defer gw.cleanup()
+
+	body := `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`
+	ctx := t.Context()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, gw.proxyURL+"/",
+		strings.NewReader(body))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+validToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }

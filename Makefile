@@ -1,4 +1,4 @@
-.PHONY: build test lint format check quality clean tidy
+.PHONY: build test policy-test lint format check quality clean tidy
 
 # Go build settings
 GOFLAGS ?= -trimpath
@@ -9,6 +9,10 @@ build:
 
 test:
 	go test -v -race -count=1 -coverprofile=coverage.out ./...
+
+# Rego policy unit tests (requires Docker; uses the same OPA image as docker-compose).
+policy-test:
+	docker run --rm -v $(CURDIR)/policies:/policies:ro openpolicyagent/opa:latest test /policies -v
 
 lint:
 	golangci-lint run ./...

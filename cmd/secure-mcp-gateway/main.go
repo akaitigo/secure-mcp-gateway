@@ -13,6 +13,7 @@ import (
 	"github.com/akaitigo/secure-mcp-gateway/internal/auth"
 	"github.com/akaitigo/secure-mcp-gateway/internal/config"
 	"github.com/akaitigo/secure-mcp-gateway/internal/grpcserver"
+	"github.com/akaitigo/secure-mcp-gateway/internal/policy"
 	"github.com/akaitigo/secure-mcp-gateway/internal/proxy"
 )
 
@@ -51,15 +52,29 @@ func run() error {
 		auth.WithSkipPaths("/health"),
 	)
 
+	// Set up OPA policy evaluation middleware (fail-close: requests are
+	// denied when the policy engine is unreachable).
+	policyClient, err := policy.NewClient(cfg.OPAURL, nil)
+	if err != nil {
+		return err
+	}
+	policyMiddleware := policy.NewMiddleware(
+		policyClient,
+		policy.WithSkipPaths("/health"),
+	)
+
 	// Build proxy with middleware chain:
-	// RequestID -> Audit -> Auth -> Proxy handler
-	// Audit wraps Auth so that both ALLOW and DENY decisions are logged,
-	// ensuring 100% audit log coverage per PRD requirements.
+	// RequestID -> Audit -> Auth -> Policy -> Proxy handler
+	// Audit wraps Auth and Policy so that both ALLOW and DENY decisions are
+	// logged, ensuring 100% audit log coverage per PRD requirements.
+	// Policy runs after Auth because it needs the authenticated client
+	// identity from the request context.
 	srv, err := proxy.New(
 		cfg.ProxyListenAddr, cfg.UpstreamMCPURL,
 		proxy.WithMiddleware(audit.RequestIDMiddleware),
 		proxy.WithMiddleware(auditMiddleware.Handler),
 		proxy.WithMiddleware(authMiddleware.Handler),
+		proxy.WithMiddleware(policyMiddleware.Handler),
 	)
 	if err != nil {
 		return err

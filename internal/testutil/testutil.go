@@ -135,6 +135,50 @@ func NewMockHydraServerWithTokenValidation(expectedToken, clientID string) *http
 	}))
 }
 
+// PolicyDecisionFunc decides whether a policy input document is allowed.
+// The input map contains the fields sent by the gateway
+// (client_id, scopes, method, tool_name).
+type PolicyDecisionFunc func(input map[string]any) bool
+
+// NewMockOPAServer creates a mock OPA server that serves the
+// gateway/authz/allow decision using the given decision function.
+func NewMockOPAServer(decide PolicyDecisionFunc) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Validate the OPA Data API decision path.
+		if r.URL.Path != "/v1/data/gateway/authz/allow" {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var payload struct {
+			Input map[string]any `json:"input"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		resp := map[string]any{
+			"result": decide(payload.Input),
+		}
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			http.Error(w, "failed to encode response", http.StatusInternalServerError)
+		}
+	}))
+}
+
+// NewAllowAllOPAServer creates a mock OPA server that allows every request.
+// Useful for tests that exercise flows other than policy enforcement.
+func NewAllowAllOPAServer() *httptest.Server {
+	return NewMockOPAServer(func(_ map[string]any) bool { return true })
+}
+
 // SetEnv sets an environment variable for the duration of the test.
 func SetEnv(t *testing.T, key, value string) {
 	t.Helper()
