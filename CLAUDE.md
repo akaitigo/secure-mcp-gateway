@@ -2,7 +2,7 @@
 
 ## 概要
 
-企業内の機密データ（PostgreSQL/Redis）にAI Agentが安全にアクセスするための、ポリシー制御機能付きModel Context Protocol (MCP) サーバー。MCP + ReBAC + 監査ログを一体提供するプロキシゲートウェイ。
+企業内MCPサーバーの手前でOAuth2認証と監査ログを提供するModel Context Protocol (MCP) ゲートウェイ。ツール単位の認可とReBACは未実装で、Phase 2の対象。
 
 ## 重要: MVP制限事項
 

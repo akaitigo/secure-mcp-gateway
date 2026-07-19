@@ -2,13 +2,13 @@
 
 > **NOTE: MVP — ポリシー評価は未実装。認証済みユーザーは全ツールにアクセス可能。** OPAによるツール粒度の認可はPhase 2で対応予定。詳細は [ADR-003](docs/adr/0003-mvp-opa-deferred.md) を参照。
 
-企業内の機密データ（PostgreSQL/Redis）にAI Agentが安全にアクセスするための、ポリシー制御機能付きModel Context Protocol (MCP) ゲートウェイ。
+企業内MCPサーバーの手前でOAuth2認証と監査ログを提供するModel Context Protocol (MCP) ゲートウェイ。現在のMVPは認証境界までを実装しており、ツール単位の認可は未実装です。
 
 ## Features
 
 - **MCP Proxy**: MCP over HTTP/SSE リクエストの透過的な中継
 - **OAuth2 Token Validation**: ORY Hydra 連携による Bearer トークン検証
-- **Tool-level Authorization**: OPA によるツール呼び出し粒度の認可ポリシー（Phase 2で実装予定）
+- **Tool-level Authorization (未実装)**: OPA によるツール呼び出し粒度の認可ポリシーはPhase 2で実装予定
 - **Audit Logging**: 全アクセスの構造化ログ出力
 
 ## Architecture
@@ -16,7 +16,7 @@
 ```
 [AI Agent] → [secure-mcp-gateway] → [MCP Server] → [Data Sources]
                     ├── Token Validation (ORY Hydra)
-                    ├── Policy Evaluation (OPA)
+                    ├── Policy Evaluation (OPA, Phase 2)
                     └── Audit Logging
 ```
 
@@ -25,7 +25,7 @@
 - Go (proxy layer, ORY Go SDK)
 - gRPC / Protocol Buffers (internal communication)
 - ORY Hydra (OAuth2/OIDC)
-- OPA (policy engine)
+- OPA (policy engine, Phase 2で統合予定)
 
 ## Quick Start
 
@@ -45,7 +45,7 @@ cp .env.example .env
 
 ### 2. Start Dependencies
 
-Docker Compose starts ORY Hydra (OAuth2), OPA (policy engine), and a mock MCP server:
+Docker Compose starts ORY Hydra (OAuth2), the future policy integration used for local development (OPA), and a mock MCP server. The gateway does not call OPA in the current MVP:
 
 ```bash
 docker compose up -d
@@ -59,7 +59,7 @@ docker compose ps
 |---------|------|---------|
 | ORY Hydra (Public) | `4444` | OAuth2 token endpoint |
 | ORY Hydra (Admin) | `4445` | Token introspection |
-| OPA | `8181` | Policy evaluation |
+| OPA | `8181` | Phase 2向けのローカル開発依存（MVPからは未使用） |
 | Mock MCP Server | `3001` | Upstream MCP (dev only) |
 
 ### 3. Build & Run
