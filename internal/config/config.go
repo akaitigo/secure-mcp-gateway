@@ -16,6 +16,8 @@ type Config struct {
 	ProxyListenAddr string
 	// HydraAdminURL is the ORY Hydra Admin API URL for token introspection.
 	HydraAdminURL string
+	// OPAURL is the OPA server base URL for tool-level policy evaluation.
+	OPAURL string
 	// AuditLogPath is the output path for audit logs ("stdout" or a file path).
 	AuditLogPath string
 	// GRPCListenAddr is the address for the gRPC management API to listen on.
@@ -28,6 +30,7 @@ func Load() (*Config, error) {
 		UpstreamMCPURL:  os.Getenv("UPSTREAM_MCP_URL"),
 		ProxyListenAddr: envOrDefault("PROXY_LISTEN_ADDR", ":8080"),
 		HydraAdminURL:   os.Getenv("HYDRA_ADMIN_URL"),
+		OPAURL:          os.Getenv("OPA_URL"),
 		AuditLogPath:    envOrDefault("AUDIT_LOG_PATH", "stdout"),
 		GRPCListenAddr:  envOrDefault("GRPC_LISTEN_ADDR", ":9090"),
 	}
@@ -54,6 +57,14 @@ func (c *Config) validate() error {
 
 	if _, err := url.ParseRequestURI(c.HydraAdminURL); err != nil {
 		return fmt.Errorf("HYDRA_ADMIN_URL is not a valid URL: %w", err)
+	}
+
+	if c.OPAURL == "" {
+		return errors.New("OPA_URL is required")
+	}
+
+	if _, err := url.ParseRequestURI(c.OPAURL); err != nil {
+		return fmt.Errorf("OPA_URL is not a valid URL: %w", err)
 	}
 
 	return nil

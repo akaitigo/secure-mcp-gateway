@@ -22,13 +22,18 @@ services:
       retries: 5
 
   # OPA - Open Policy Agent
+  # The -debug variant ships busybox so the wget healthcheck can run
+  # (the default image is distroless and has no shell/wget).
   opa:
-    image: openpolicyagent/opa:latest
+    image: openpolicyagent/opa:latest-debug
     ports:
       - "8181:8181"
     command:
       - run
       - --server
+      # Bind to all interfaces; the default (localhost) is unreachable
+      # through the published port from the host.
+      - --addr=0.0.0.0:8181
       - --log-level=info
       - --set=decision_logs.console=true
       - /policies
@@ -36,7 +41,7 @@ services:
       - ./policies:/policies:ro
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:8181/health"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8181/health"]
       interval: 10s
       timeout: 5s
       retries: 5

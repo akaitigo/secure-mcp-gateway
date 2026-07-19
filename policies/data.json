@@ -1,0 +1,7 @@
+{
+  "gateway": {
+    "permissions": {
+      "demo-agent": ["mock-tool"]
+    }
+  }
+}
