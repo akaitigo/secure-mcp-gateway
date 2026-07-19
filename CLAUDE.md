@@ -2,7 +2,7 @@
 
 ## 概要
 
-企業内MCPサーバーの手前でOAuth2認証と監査ログを提供するModel Context Protocol (MCP) ゲートウェイ。ツール単位の認可とReBACは未実装で、Phase 2の対象。
+企業内MCPサーバーの手前でOAuth2認証と監査ログを提供するModel Context Protocol (MCP) ゲートウェイ。ツール単位の認可は未実装でPhase 2の対象。ReBACは将来必要になった場合に再検討する。
 
 ## 重要: MVP制限事項
 
